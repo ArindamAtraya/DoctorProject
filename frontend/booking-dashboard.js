@@ -20,6 +20,8 @@ async function initializeBookingDashboard() {
 
 async function loadBookingDetails(appointmentId) {
     try {
+        console.log('Loading booking details for:', appointmentId);
+        
         // Fetch appointment from backend API
         const token = localStorage.getItem('authToken');
         const response = await fetch(`/api/appointments/${appointmentId}`, {
@@ -28,17 +30,21 @@ async function loadBookingDetails(appointmentId) {
             }
         });
         
+        console.log('Response status:', response.status);
+        
         if (!response.ok) {
-            throw new Error('Appointment not found');
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Appointment not found');
         }
         
         const appointment = await response.json();
+        console.log('Appointment data:', appointment);
         
         // Format appointment data for display
         currentBooking = {
             _id: appointment._id,
             doctorName: appointment.doctorName,
-            doctorSpecialty: appointment.doctorName ? 'Specialty' : 'N/A',
+            doctorSpecialty: 'Specialist',
             hospital: appointment.providerName,
             fee: appointment.consultationFee,
             date: appointment.date,
@@ -52,7 +58,7 @@ async function loadBookingDetails(appointmentId) {
         updateDashboardDisplay();
     } catch (error) {
         console.error('Error loading appointment:', error);
-        alert('Appointment not found. Redirecting to home page.');
+        alert(`Error: ${error.message} - Redirecting to home page.`);
         window.location.href = 'index.html';
     }
 }

@@ -504,7 +504,14 @@ async function confirmBooking() {
         }
         
         const result = await response.json();
-        const appointmentId = result.appointment.id;
+        console.log('Booking result:', result);
+        
+        // Get appointment ID from response (could be id or _id)
+        const appointmentId = result.appointment.id || result.appointment._id;
+        
+        if (!appointmentId) {
+            throw new Error('No appointment ID received');
+        }
         
         // Show success message
         showNotification('Appointment booked successfully!', 'success');
