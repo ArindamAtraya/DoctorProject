@@ -421,7 +421,7 @@ function createDoctorCard(doctor) {
             </div>
             <div class="card-footer">
                 <div class="price">₹${doctor.fee || doctor.consultationFee || 500}</div>
-                <button class="btn btn-primary" onclick="openDoctorAvailability('${doctor.id}')">
+                <button class="btn btn-primary" onclick="openDoctorAvailability('${doctor._id || doctor.id}')">
                     <i class="fas fa-calendar-check"></i> Book Now
                 </button>
             </div>
