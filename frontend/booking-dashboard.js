@@ -131,48 +131,67 @@ function updateDashboardDisplay() {
     
     console.log('Updating dashboard with booking:', currentBooking);
     
-    // Update doctor information
-    document.getElementById('dashboardDoctorName').textContent = currentBooking.doctorName;
-    document.getElementById('dashboardSpecialty').textContent = currentBooking.doctorSpecialty;
-    document.getElementById('dashboardHospital').textContent = currentBooking.hospital;
-    document.getElementById('dashboardFee').textContent = `₹${currentBooking.fee}`;
-    
-    // Update appointment details
-    const appointmentDate = new Date(currentBooking.date);
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    document.getElementById('dashboardDate').textContent = appointmentDate.toLocaleDateString('en-US', options);
-    document.getElementById('dashboardTime').textContent = currentBooking.time;
-    document.getElementById('dashboardBookingId').textContent = currentBooking.bookingId;
-    
-    const bookingTime = new Date(currentBooking.bookingTime);
-    document.getElementById('dashboardBookingTime').textContent = bookingTime.toLocaleString('en-US', {
-        weekday: 'long',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-    });
-    
-    // Update patient information
-    document.getElementById('dashboardPatientName').textContent = currentBooking.patientName;
-    document.getElementById('dashboardPatientId').textContent = currentBooking.patientId;
-    
-    // Update queue information
-    document.getElementById('dashboardQueuePosition').textContent = `#${currentBooking.queueNumber}`;
-    document.getElementById('dashboardWaitTime').textContent = `${currentBooking.estimatedWait} minutes`;
-    
-    // Calculate estimated time
-    const [hours, minutes] = currentBooking.time.split(':').map(Number);
-    const slotTime = new Date(currentBooking.date);
-    slotTime.setHours(hours, minutes, 0, 0);
-    
-    const estimatedTime = new Date(slotTime.getTime() + currentBooking.estimatedWait * 60000);
-    const estimatedTimeStr = estimatedTime.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit',
-        hour12: true 
-    });
-    
-    document.getElementById('dashboardEstimatedTime').textContent = estimatedTimeStr;
+    try {
+        // Update doctor information
+        const docNameEl = document.getElementById('dashboardDoctorName');
+        if (docNameEl) docNameEl.textContent = currentBooking.doctorName || 'N/A';
+        
+        const specEl = document.getElementById('dashboardSpecialty');
+        if (specEl) specEl.textContent = currentBooking.doctorSpecialty || 'Specialist';
+        
+        const hospEl = document.getElementById('dashboardHospital');
+        if (hospEl) hospEl.textContent = currentBooking.hospital || 'N/A';
+        
+        const feeEl = document.getElementById('dashboardFee');
+        if (feeEl) feeEl.textContent = `₹${currentBooking.fee || 0}`;
+        
+        // Update appointment details
+        const appointmentDate = new Date(currentBooking.date);
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        
+        const dateEl = document.getElementById('dashboardDate');
+        if (dateEl) dateEl.textContent = appointmentDate.toLocaleDateString('en-US', options);
+        
+        const timeEl = document.getElementById('dashboardTime');
+        if (timeEl) timeEl.textContent = currentBooking.time || 'N/A';
+        
+        const bookingIdEl = document.getElementById('dashboardBookingId');
+        if (bookingIdEl) bookingIdEl.textContent = currentBooking._id || 'N/A';
+        
+        // Update patient information
+        const patientNameEl = document.getElementById('dashboardPatientName');
+        if (patientNameEl) patientNameEl.textContent = currentBooking.patientName || 'You';
+        
+        const patientIdEl = document.getElementById('dashboardPatientId');
+        if (patientIdEl) patientIdEl.textContent = currentBooking.patientId || 'N/A';
+        
+        // Update queue information
+        const queueEl = document.getElementById('dashboardQueuePosition');
+        if (queueEl) queueEl.textContent = `#${currentBooking.queueNumber || 1}`;
+        
+        const waitEl = document.getElementById('dashboardWaitTime');
+        if (waitEl) waitEl.textContent = `${currentBooking.estimatedWait || 0} minutes`;
+        
+        // Calculate estimated time
+        const timeParts = currentBooking.time.split(':');
+        if (timeParts.length === 2) {
+            const [hours, minutes] = timeParts.map(Number);
+            const slotTime = new Date(currentBooking.date);
+            slotTime.setHours(hours, minutes, 0, 0);
+            
+            const estimatedTime = new Date(slotTime.getTime() + (currentBooking.estimatedWait || 0) * 60000);
+            const estimatedTimeStr = estimatedTime.toLocaleTimeString('en-US', { 
+                hour: 'numeric', 
+                minute: '2-digit',
+                hour12: true 
+            });
+            
+            const estTimeEl = document.getElementById('dashboardEstimatedTime');
+            if (estTimeEl) estTimeEl.textContent = estimatedTimeStr;
+        }
+    } catch (error) {
+        console.error('Error updating dashboard display:', error);
+    }
 }
 
 function rescheduleAppointment() {
