@@ -2,25 +2,27 @@
 let currentBooking = null;
 
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('📊 Booking dashboard loaded');
     initializeBookingDashboard();
 });
 
-async function initializeBookingDashboard() {
-    console.log('Initializing booking dashboard...');
+function initializeBookingDashboard() {
+    console.log('🔍 Initializing booking dashboard...');
     
-    // Get appointment ID from URL parameters
-    const urlParams = new URLSearchParams(window.location.search);
-    const appointmentId = urlParams.get('appointmentId');
-    
-    console.log('Appointment ID from URL:', appointmentId);
-    
-    // Always check sessionStorage first for backup data
+    // Get booking data from sessionStorage - THIS IS REQUIRED
     const backup = sessionStorage.getItem('lastBooking');
-    console.log('Backup data available:', !!backup);
+    console.log('✅ Backup available:', !!backup);
     
-    if (backup) {
-        console.log('Loading from backup...');
+    if (!backup) {
+        console.error('❌ NO BOOKING DATA FOUND');
+        document.body.innerHTML = '<div style="text-align:center; padding:50px;"><h2>No appointment found</h2><p>Please book an appointment first.</p><a href="index.html" style="color: #3B82F6; text-decoration: none;">← Go Back to Home</a></div>';
+        return;
+    }
+    
+    try {
         const bookingData = JSON.parse(backup);
+        console.log('📦 Booking data:', bookingData);
+        
         currentBooking = {
             _id: bookingData.id,
             doctorName: bookingData.doctorName,
@@ -34,192 +36,81 @@ async function initializeBookingDashboard() {
             queueNumber: bookingData.queueNumber,
             estimatedWait: 0
         };
-        console.log('Loaded booking from backup:', currentBooking);
+        
+        console.log('✨ Current booking set:', currentBooking);
         updateDashboardDisplay();
-        return;
-    }
-    
-    // If no backup, try to fetch from API
-    if (appointmentId) {
-        await loadBookingDetails(appointmentId);
-    } else {
-        await loadLatestBooking();
-    }
-}
-
-async function loadBookingDetails(appointmentId) {
-    console.log('Loading booking details for:', appointmentId);
-    
-    // First, try to use backup data from sessionStorage
-    const backup = sessionStorage.getItem('lastBooking');
-    if (backup) {
-        const bookingData = JSON.parse(backup);
-        currentBooking = {
-            _id: bookingData.id,
-            doctorName: bookingData.doctorName,
-            doctorSpecialty: 'Specialist',
-            hospital: bookingData.providerName,
-            fee: bookingData.consultationFee,
-            date: bookingData.date,
-            time: bookingData.time,
-            patientName: 'You',
-            patientId: 'N/A',
-            queueNumber: bookingData.queueNumber,
-            estimatedWait: 0
-        };
-        console.log('Using backup booking data:', currentBooking);
-        updateDashboardDisplay();
-        return;
-    }
-    
-    // If no backup, try to fetch from API
-    try {
-        const token = localStorage.getItem('authToken');
-        const response = await fetch(`/api/appointments/${appointmentId}`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
         
-        console.log('Response status:', response.status);
-        
-        if (response.ok) {
-            const appointment = await response.json();
-            console.log('Appointment data:', appointment);
-            
-            currentBooking = {
-                _id: appointment._id,
-                doctorName: appointment.doctorName,
-                doctorSpecialty: 'Specialist',
-                hospital: appointment.providerName,
-                fee: appointment.consultationFee,
-                date: appointment.date,
-                time: appointment.time,
-                patientName: appointment.patientName,
-                patientId: typeof appointment.patientId === 'string' ? appointment.patientId : appointment.patientId._id,
-                queueNumber: appointment.queueNumber,
-                estimatedWait: 0
-            };
-            
-            updateDashboardDisplay();
-        }
     } catch (error) {
-        console.error('Error fetching appointment from API:', error);
-    }
-}
-
-async function loadLatestBooking() {
-    try {
-        // First check sessionStorage for backup
-        const backup = sessionStorage.getItem('lastBooking');
-        if (backup) {
-            const bookingData = JSON.parse(backup);
-            currentBooking = {
-                _id: bookingData.id,
-                doctorName: bookingData.doctorName,
-                doctorSpecialty: 'Specialist',
-                hospital: bookingData.providerName,
-                fee: bookingData.consultationFee,
-                date: bookingData.date,
-                time: bookingData.time,
-                patientName: 'You',
-                patientId: 'N/A',
-                queueNumber: bookingData.queueNumber,
-                estimatedWait: 0
-            };
-            console.log('Using backup booking data from session:', currentBooking);
-            updateDashboardDisplay();
-            return;
-        }
-        
-        // Try to fetch from backend
-        const token = localStorage.getItem('authToken');
-        const response = await fetch('/api/my-appointments', {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-        
-        if (response.ok) {
-            const bookings = await response.json();
-            if (bookings.length > 0) {
-                currentBooking = bookings[bookings.length - 1];
-                updateDashboardDisplay();
-            }
-        }
-    } catch (error) {
-        console.error('Error loading bookings:', error);
+        console.error('❌ Error parsing booking data:', error);
+        document.body.innerHTML = '<div style="text-align:center; padding:50px;"><h2>Error loading appointment</h2><p>' + error.message + '</p><a href="index.html" style="color: #3B82F6; text-decoration: none;">← Go Back to Home</a></div>';
     }
 }
 
 function updateDashboardDisplay() {
     if (!currentBooking) {
-        console.log('No booking data available');
+        console.log('❌ No booking data available');
         return;
     }
     
-    console.log('Updating dashboard with booking:', currentBooking);
+    console.log('🎨 Updating dashboard display...');
     
     try {
-        // Update doctor information
-        const docNameEl = document.getElementById('dashboardDoctorName');
-        if (docNameEl) docNameEl.textContent = currentBooking.doctorName || 'N/A';
+        // Update all elements safely
+        const updates = [
+            ['dashboardDoctorName', currentBooking.doctorName || 'N/A'],
+            ['dashboardSpecialty', currentBooking.doctorSpecialty || 'Specialist'],
+            ['dashboardHospital', currentBooking.hospital || 'N/A'],
+            ['dashboardFee', `₹${currentBooking.fee || 0}`],
+            ['dashboardDate', new Date(currentBooking.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })],
+            ['dashboardTime', currentBooking.time || 'N/A'],
+            ['dashboardBookingId', currentBooking._id || 'N/A'],
+            ['dashboardPatientName', currentBooking.patientName || 'You'],
+            ['dashboardPatientId', currentBooking.patientId || 'N/A'],
+            ['dashboardQueuePosition', `#${currentBooking.queueNumber || 1}`],
+            ['dashboardWaitTime', `${currentBooking.estimatedWait || 0} minutes`]
+        ];
         
-        const specEl = document.getElementById('dashboardSpecialty');
-        if (specEl) specEl.textContent = currentBooking.doctorSpecialty || 'Specialist';
-        
-        const hospEl = document.getElementById('dashboardHospital');
-        if (hospEl) hospEl.textContent = currentBooking.hospital || 'N/A';
-        
-        const feeEl = document.getElementById('dashboardFee');
-        if (feeEl) feeEl.textContent = `₹${currentBooking.fee || 0}`;
-        
-        // Update appointment details
-        const appointmentDate = new Date(currentBooking.date);
-        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-        
-        const dateEl = document.getElementById('dashboardDate');
-        if (dateEl) dateEl.textContent = appointmentDate.toLocaleDateString('en-US', options);
-        
-        const timeEl = document.getElementById('dashboardTime');
-        if (timeEl) timeEl.textContent = currentBooking.time || 'N/A';
-        
-        const bookingIdEl = document.getElementById('dashboardBookingId');
-        if (bookingIdEl) bookingIdEl.textContent = currentBooking._id || 'N/A';
-        
-        // Update patient information
-        const patientNameEl = document.getElementById('dashboardPatientName');
-        if (patientNameEl) patientNameEl.textContent = currentBooking.patientName || 'You';
-        
-        const patientIdEl = document.getElementById('dashboardPatientId');
-        if (patientIdEl) patientIdEl.textContent = currentBooking.patientId || 'N/A';
-        
-        // Update queue information
-        const queueEl = document.getElementById('dashboardQueuePosition');
-        if (queueEl) queueEl.textContent = `#${currentBooking.queueNumber || 1}`;
-        
-        const waitEl = document.getElementById('dashboardWaitTime');
-        if (waitEl) waitEl.textContent = `${currentBooking.estimatedWait || 0} minutes`;
+        updates.forEach(([id, value]) => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.textContent = value;
+                console.log(`✅ Updated ${id}: ${value}`);
+            } else {
+                console.warn(`⚠️ Element not found: ${id}`);
+            }
+        });
         
         // Calculate estimated time
-        const timeParts = currentBooking.time.split(':');
-        if (timeParts.length === 2) {
-            const [hours, minutes] = timeParts.map(Number);
-            const slotTime = new Date(currentBooking.date);
-            slotTime.setHours(hours, minutes, 0, 0);
-            
-            const estimatedTime = new Date(slotTime.getTime() + (currentBooking.estimatedWait || 0) * 60000);
-            const estimatedTimeStr = estimatedTime.toLocaleTimeString('en-US', { 
-                hour: 'numeric', 
-                minute: '2-digit',
-                hour12: true 
-            });
-            
-            const estTimeEl = document.getElementById('dashboardEstimatedTime');
-            if (estTimeEl) estTimeEl.textContent = estimatedTimeStr;
+        if (currentBooking.time) {
+            try {
+                const timeParts = currentBooking.time.split(':');
+                if (timeParts.length === 2) {
+                    const [hours, minutes] = timeParts.map(Number);
+                    const slotTime = new Date(currentBooking.date);
+                    slotTime.setHours(hours, minutes, 0, 0);
+                    
+                    const estimatedTime = new Date(slotTime.getTime() + (currentBooking.estimatedWait || 0) * 60000);
+                    const estimatedTimeStr = estimatedTime.toLocaleTimeString('en-US', { 
+                        hour: 'numeric', 
+                        minute: '2-digit',
+                        hour12: true 
+                    });
+                    
+                    const estTimeEl = document.getElementById('dashboardEstimatedTime');
+                    if (estTimeEl) {
+                        estTimeEl.textContent = estimatedTimeStr;
+                        console.log(`✅ Updated estimated time: ${estimatedTimeStr}`);
+                    }
+                }
+            } catch (timeError) {
+                console.error('⚠️ Error calculating estimated time:', timeError);
+            }
         }
+        
+        console.log('✨ Dashboard display updated successfully!');
+        
     } catch (error) {
-        console.error('Error updating dashboard display:', error);
+        console.error('❌ Error updating dashboard display:', error);
     }
 }
 
@@ -231,23 +122,20 @@ function rescheduleAppointment() {
 
 function cancelAppointment() {
     if (confirm('Are you sure you want to cancel this appointment? This action cannot be undone.')) {
-        // In real app, this would be an API call
-        const bookings = JSON.parse(localStorage.getItem('patientBookings')) || [];
-        const updatedBookings = bookings.filter(booking => booking.bookingId !== currentBooking.bookingId);
-        localStorage.setItem('patientBookings', JSON.stringify(updatedBookings));
-        
         alert('Appointment cancelled successfully.');
-        window.location.href = 'patient-dashboard.html';
+        sessionStorage.removeItem('lastBooking');
+        window.location.href = 'index.html';
     }
 }
 
 function downloadTicket() {
-    // Create a printable ticket
+    if (!currentBooking) return;
+    
     const ticketContent = `
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Appointment Ticket - ${currentBooking.bookingId}</title>
+            <title>Appointment Ticket</title>
             <style>
                 body { font-family: Arial, sans-serif; padding: 20px; }
                 .ticket { border: 2px solid #000; padding: 20px; max-width: 500px; margin: 0 auto; }
@@ -266,10 +154,10 @@ function downloadTicket() {
                 </div>
                 <div class="section">
                     <div class="section-title">Appointment Details</div>
-                    <div class="detail-row"><span>Booking ID:</span><span>${currentBooking.bookingId}</span></div>
-                    <div class="detail-row"><span>Date:</span><span>${document.getElementById('dashboardDate').textContent}</span></div>
+                    <div class="detail-row"><span>Booking ID:</span><span>${currentBooking._id}</span></div>
+                    <div class="detail-row"><span>Date:</span><span>${currentBooking.date}</span></div>
                     <div class="detail-row"><span>Time:</span><span>${currentBooking.time}</span></div>
-                    <div class="detail-row"><span>Queue Position:</span><span>${currentBooking.queuePosition}</span></div>
+                    <div class="detail-row"><span>Queue Position:</span><span>#${currentBooking.queueNumber}</span></div>
                 </div>
                 <div class="section">
                     <div class="section-title">Doctor Information</div>
@@ -280,10 +168,9 @@ function downloadTicket() {
                 <div class="section">
                     <div class="section-title">Patient Information</div>
                     <div class="detail-row"><span>Patient:</span><span>${currentBooking.patientName}</span></div>
-                    <div class="detail-row"><span>Patient ID:</span><span>${currentBooking.patientId}</span></div>
                 </div>
                 <div class="barcode">
-                    ${currentBooking.bookingId}
+                    ${currentBooking._id}
                     <br>
                     <small>Scan at reception</small>
                 </div>
@@ -299,20 +186,6 @@ function downloadTicket() {
 }
 
 function getPharmacyDirections() {
-    // Open directions in Google Maps
     const address = encodeURIComponent('Apollo Hospital, 123 Medical Avenue, City Center');
     window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank');
 }
-
-// Auto-refresh queue information every 30 seconds
-setInterval(() => {
-    if (currentBooking) {
-        // In real app, this would update from the server
-        // For demo, we'll simulate queue movement
-        if (currentBooking.queuePosition > 1 && Math.random() > 0.7) {
-            currentBooking.queuePosition--;
-            currentBooking.estimatedWait = (currentBooking.queuePosition - 1) * 15;
-            updateDashboardDisplay();
-        }
-    }
-}, 30000);
