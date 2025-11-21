@@ -243,7 +243,7 @@ function selectDate(dateString) {
     loadTimeSlots();
 }
 
-function loadTimeSlots() {
+async function loadTimeSlots() {
     if (isLoading) return;
     
     isLoading = true;
@@ -261,9 +261,9 @@ function loadTimeSlots() {
         timeSlotsGrid.appendChild(loadingSlot);
     }
     
-    // Generate time slots based on doctor's visiting hours
-    setTimeout(() => {
-        const timeSlots = generateTimeSlots();
+    // Generate time slots based on doctor's visiting hours with real booking data
+    try {
+        const timeSlots = await generateTimeSlots();
         
         timeSlotsGrid.innerHTML = '';
         
@@ -304,8 +304,11 @@ function loadTimeSlots() {
         
         isLoading = false;
         timeSlotsGrid.style.animation = 'slideUp 0.5s ease';
-        
-    }, 500);
+    } catch (error) {
+        console.error('Error loading time slots:', error);
+        timeSlotsGrid.innerHTML = '<p>Error loading time slots. Please try again.</p>';
+        isLoading = false;
+    }
 }
 
 function getSlotStatus(queuePosition) {
@@ -321,14 +324,14 @@ function formatTimeForDisplay(time) {
     return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
 }
 
-function generateTimeSlots() {
+async function generateTimeSlots() {
     const slots = [];
     if (!currentDoctor || !currentDoctor.visitingHours) {
         // Default 9 AM to 5 PM if no visiting hours
         for (let i = 9; i < 17; i++) {
             slots.push({
                 time: `${i}:00`,
-                queuePosition: Math.floor(Math.random() * 5),
+                queuePosition: 0,
                 available: true
             });
         }
@@ -344,18 +347,43 @@ function generateTimeSlots() {
         return [];
     }
     
-    // Parse start and end times
-    const [startHour, startMin] = dayHours.startTime.split(':').map(Number);
-    const [endHour, endMin] = dayHours.endTime.split(':').map(Number);
-    
-    // Generate slots every hour
-    for (let hour = startHour; hour < endHour; hour++) {
-        const time = `${hour}:00`;
-        slots.push({
-            time: time,
-            queuePosition: Math.floor(Math.random() * 5),
-            available: true
-        });
+    // Fetch real appointments for this doctor on this date
+    try {
+        const dateString = selectedDate.toISOString().split('T')[0];
+        const response = await fetch(`/api/doctor-appointments/${currentDoctor.id}?date=${dateString}`);
+        const appointments = response.ok ? await response.json() : [];
+        
+        // Parse start and end times
+        const [startHour, startMin] = dayHours.startTime.split(':').map(Number);
+        const [endHour, endMin] = dayHours.endTime.split(':').map(Number);
+        
+        // Generate slots every hour
+        for (let hour = startHour; hour < endHour; hour++) {
+            const time = `${hour}:00`;
+            
+            // Count real bookings for this time slot
+            const bookingsForSlot = appointments.filter(apt => apt.time === time).length;
+            
+            slots.push({
+                time: time,
+                queuePosition: bookingsForSlot,
+                available: true
+            });
+        }
+    } catch (error) {
+        console.error('Error fetching appointments:', error);
+        // Fallback: generate slots without real data
+        const [startHour, startMin] = dayHours.startTime.split(':').map(Number);
+        const [endHour, endMin] = dayHours.endTime.split(':').map(Number);
+        
+        for (let hour = startHour; hour < endHour; hour++) {
+            const time = `${hour}:00`;
+            slots.push({
+                time: time,
+                queuePosition: 0,
+                available: true
+            });
+        }
     }
     
     return slots;
