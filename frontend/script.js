@@ -44,33 +44,10 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
     setupEventListeners();
     loadInitialData();
-    initializeDemoAccounts();
     initializeMobileFeatures();
 });
 
-// Demo Accounts Initialization
-function initializeDemoAccounts() {
-    const users = JSON.parse(localStorage.getItem('users')) || [];
-    
-    // Demo patient account with hospital records
-    const demoPatient = {
-        id: 'user_001',
-        name: 'John Doe',
-        email: 'patient@demo.com',
-        password: 'demo123',
-        role: 'patient',
-        patientId: 'P123456',
-        phone: '+1 234-567-8900',
-        dob: '1988-05-15'
-    };
-
-    // Check if demo account already exists
-    const existingPatient = users.find(u => u.email === demoPatient.email);
-    if (!existingPatient) {
-        users.push(demoPatient);
-        localStorage.setItem('users', JSON.stringify(users));
-    }
-}
+// Demo accounts removed - all authentication now goes through backend
 
 // Mobile Features Initialization
 function initializeMobileFeatures() {
@@ -295,9 +272,8 @@ async function handleLogin(e) {
             }, 1000);
         }
     } catch (error) {
-        // API failed, try demo authentication
-        console.log('API login failed, trying demo authentication...');
-        handleDemoLogin(email, password);
+        console.error('Login error:', error);
+        showNotification('Invalid email or password. Please try again.', 'error');
     }
 }
 
@@ -322,77 +298,12 @@ async function handleSignup(e) {
         closeAllModals();
         showNotification('Account created successfully!', 'success');
     } catch (error) {
-        // API failed, create demo account
-        console.log('API signup failed, creating demo account...');
-        createDemoAccount(name, email, password, phone);
+        console.error('Signup error:', error);
+        showNotification('Failed to create account. Please try again.', 'error');
     }
 }
 
-// Demo Authentication Functions
-function handleDemoLogin(email, password) {
-    const users = JSON.parse(localStorage.getItem('users')) || [];
-    const user = users.find(u => u.email === email && u.password === password);
-    
-    if (user) {
-        // Generate demo token
-        const token = 'demo_token_' + Math.random().toString(36).substr(2);
-        localStorage.setItem('token', token);
-        localStorage.setItem('currentUser', JSON.stringify(user));
-        currentUser = user;
-        
-        updateAuthUI();
-        closeAllModals();
-        showNotification('Demo login successful!', 'success');
-        
-        // Redirect to dashboard for doctors/hospitals
-        if (currentUser.role === 'doctor' || currentUser.role === 'hospital') {
-            setTimeout(() => {
-                window.location.href = 'dashboard.html';
-            }, 1000);
-        }
-    } else {
-        // Check if it's the pre-created demo account
-        if (email === 'patient@demo.com' && password === 'demo123') {
-            // Auto-create the demo account if it doesn't exist
-            initializeDemoAccounts();
-            handleDemoLogin(email, password);
-        } else {
-            showNotification('Invalid email or password. Try: patient@demo.com / demo123', 'error');
-        }
-    }
-}
-
-function createDemoAccount(name, email, password, phone) {
-    const users = JSON.parse(localStorage.getItem('users')) || [];
-    
-    // Check if user already exists
-    if (users.find(u => u.email === email)) {
-        showNotification('User already exists with this email', 'error');
-        return;
-    }
-    
-    const newUser = {
-        id: 'user_' + Date.now(),
-        name: name,
-        email: email,
-        password: password,
-        phone: phone,
-        role: 'patient',
-        patientId: 'P' + Math.random().toString(36).substr(2, 6).toUpperCase()
-    };
-    
-    users.push(newUser);
-    localStorage.setItem('users', JSON.stringify(users));
-    
-    const token = 'demo_token_' + Math.random().toString(36).substr(2);
-    localStorage.setItem('token', token);
-    localStorage.setItem('currentUser', JSON.stringify(newUser));
-    currentUser = newUser;
-    
-    updateAuthUI();
-    closeAllModals();
-    showNotification('Demo account created successfully!', 'success');
-}
+// Demo functions removed - all authentication and accounts are now handled by the backend API
 
 function handleLogout() {
     localStorage.removeItem('token');
@@ -413,50 +324,54 @@ async function loadInitialData() {
         ]);
     } catch (error) {
         console.error('Error loading initial data:', error);
-        // Load mock data if API is not available
-        loadMockData();
+        showNotification('Failed to load data. Please refresh the page.', 'error');
     }
 }
 
 async function loadDoctors() {
     try {
         const data = await apiCall('/doctors');
-        doctors = data;
+        doctors = data || [];
         renderDoctors(doctors);
         updateHospitalFilter();
     } catch (error) {
-        // If API fails, use mock data
-        loadMockDoctors();
+        console.error('Error loading doctors:', error);
+        showNotification('Failed to load doctors. Please refresh the page.', 'error');
+        doctors = [];
+        renderDoctors(doctors);
     }
 }
 
 async function loadHospitals() {
     try {
-        const data = await apiCall('/hospitals');
-        hospitals = data;
+        const data = await apiCall('/healthcare-providers?type=hospital');
+        hospitals = data || [];
         renderHospitals(hospitals);
     } catch (error) {
-        loadMockHospitals();
+        console.error('Error loading hospitals:', error);
+        hospitals = [];
+        renderHospitals(hospitals);
     }
 }
 
 async function loadPharmacies() {
     try {
-        const data = await apiCall('/pharmacies');
-        pharmacies = data;
+        const data = await apiCall('/healthcare-providers?type=pharmacy');
+        pharmacies = data || [];
         renderPharmacies(pharmacies);
     } catch (error) {
-        loadMockPharmacies();
+        console.error('Error loading pharmacies:', error);
+        pharmacies = [];
+        renderPharmacies(pharmacies);
     }
 }
 
 async function loadTests() {
-    try {
-        const data = await apiCall('/tests');
-        tests = data;
-        renderTests(tests);
-    } catch (error) {
-        loadMockTests();
+    // Tests feature not yet implemented - skip for now
+    tests = [];
+    const container = elements.testsContainer;
+    if (container) {
+        container.innerHTML = '<p style="text-align: center; padding: 20px;">Medical tests booking coming soon!</p>';
     }
 }
 
@@ -1194,24 +1109,34 @@ function openLocationModal() {
     showModal('locationModal');
 }
 
-function findHealthcareProviders() {
+async function findHealthcareProviders() {
     const location = document.getElementById('bookingLocation').value;
     const specialty = document.getElementById('bookingSpecialty').value;
 
     if (!location) {
-        showNotification('Please enter a location', 'error');
+        showNotification('Please enter a location (district or state)', 'error');
         return;
     }
 
     currentLocation = location;
     currentSpecialty = specialty;
 
-    // Simulate API call - in real app, this would call your backend
-    const providers = simulateHealthcareProviderSearch(location, specialty);
-    
-    displayHealthcareProviders(providers, { location, specialty });
-    closeAllModals();
-    showModal('providersModal');
+    try {
+        // Search for providers by location (district or state)
+        const providers = await apiCall(`/healthcare-providers?search=${encodeURIComponent(location)}`);
+        
+        if (!providers || providers.length === 0) {
+            showNotification(`No healthcare providers found in ${location}`, 'info');
+            return;
+        }
+
+        displayHealthcareProviders(providers, { location, specialty });
+        closeAllModals();
+        showModal('providersModal');
+    } catch (error) {
+        console.error('Error searching providers:', error);
+        showNotification('Failed to search providers. Please try again.', 'error');
+    }
 }
 
 function simulateHealthcareProviderSearch(location, specialty) {

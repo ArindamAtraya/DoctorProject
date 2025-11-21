@@ -148,6 +148,8 @@ app.post('/api/auth/register', async (req, res) => {
                 name: providerInfo.facilityName,
                 type: role,
                 address: providerInfo.address,
+                district: providerInfo.district || 'Not specified',
+                state: providerInfo.state || 'Not specified',
                 phone: phone,
                 email: email,
                 registrationNumber: providerInfo.registrationNumber,
@@ -326,7 +328,13 @@ app.get('/api/healthcare-providers', async (req, res) => {
         }
 
         if (search) {
-            query.name = new RegExp(search, 'i');
+            // Search by name, district, or state
+            query.$or = [
+                { name: new RegExp(search, 'i') },
+                { district: new RegExp(search, 'i') },
+                { state: new RegExp(search, 'i') },
+                { address: new RegExp(search, 'i') }
+            ];
         }
 
         const providers = await HealthcareProvider.find(query);
@@ -382,10 +390,17 @@ app.post('/api/doctors', authenticateToken, requireProvider, upload.single('phot
     try {
         const { name, specialty, qualification, experience, consultationFee, about, slotsPerDay, degrees } = req.body;
         
+        console.log('Adding doctor with data:', { name, specialty, qualification, experience, consultationFee });
+        
         const provider = await HealthcareProvider.findOne({ userId: req.user.id });
         
         if (!provider) {
+            console.log('Provider not found for user:', req.user.id);
             return res.status(404).json({ error: 'Healthcare provider not found' });
+        }
+
+        if (!name || !specialty || !qualification || !experience || !consultationFee) {
+            return res.status(400).json({ error: 'Missing required fields: name, specialty, qualification, experience, consultationFee' });
         }
 
         let photoPath = '';
@@ -398,6 +413,7 @@ app.post('/api/doctors', authenticateToken, requireProvider, upload.single('phot
             try {
                 parsedDegrees = JSON.parse(degrees);
             } catch (e) {
+                console.error('Error parsing degrees:', e);
                 parsedDegrees = [];
             }
         }
@@ -418,13 +434,14 @@ app.post('/api/doctors', authenticateToken, requireProvider, upload.single('phot
 
         await newDoctor.save();
 
+        console.log('Doctor added successfully:', newDoctor._id);
         res.status(201).json({
             message: 'Doctor added successfully',
             doctor: newDoctor
         });
     } catch (error) {
         console.error('Add doctor error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: error.message || 'Internal server error', details: error.toString() });
     }
 });
 

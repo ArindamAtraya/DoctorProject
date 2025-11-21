@@ -241,9 +241,11 @@ class ProviderAuth {
         const phone = document.getElementById('providerPhone').value;
         const registrationNumber = document.getElementById('registrationNumber').value;
         const address = document.getElementById('facilityAddress').value;
+        const district = document.getElementById('facilityDistrict').value;
+        const state = document.getElementById('facilityState').value;
 
         // Validate form
-        if (!this.validateProviderForm(facilityName, email, password, phone, registrationNumber, address)) {
+        if (!this.validateProviderForm(facilityName, email, password, phone, registrationNumber, address, district, state)) {
             return;
         }
 
@@ -257,7 +259,9 @@ class ProviderAuth {
                 facilityName: facilityName,
                 facilityType: this.currentProviderType,
                 registrationNumber: registrationNumber,
-                address: address
+                address: address,
+                district: district,
+                state: state
             }
         };
 
@@ -288,9 +292,9 @@ class ProviderAuth {
         }
     }
 
-    validateProviderForm(facilityName, email, password, phone, registrationNumber, address) {
-        if (!facilityName || !email || !password || !phone || !registrationNumber || !address) {
-            this.showNotification('Please fill in all required fields', 'error');
+    validateProviderForm(facilityName, email, password, phone, registrationNumber, address, district, state) {
+        if (!facilityName || !email || !password || !phone || !registrationNumber || !address || !district || !state) {
+            this.showNotification('Please fill in all required fields including district and state', 'error');
             return false;
         }
 

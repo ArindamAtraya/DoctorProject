@@ -19,6 +19,16 @@ const healthcareProviderSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    district: {
+        type: String,
+        required: false,
+        default: 'Not specified'
+    },
+    state: {
+        type: String,
+        required: false,
+        default: 'Not specified'
+    },
     phone: {
         type: String,
         required: true
