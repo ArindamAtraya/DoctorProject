@@ -3,5 +3,4 @@ npm-debug.log
 .env
 .DS_Store
 *.log
-.replit
-replit.nix
+frontend/uploads/
