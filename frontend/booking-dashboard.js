@@ -19,10 +19,32 @@ async function initializeBookingDashboard() {
 }
 
 async function loadBookingDetails(appointmentId) {
+    console.log('Loading booking details for:', appointmentId);
+    
+    // First, try to use backup data from sessionStorage
+    const backup = sessionStorage.getItem('lastBooking');
+    if (backup) {
+        const bookingData = JSON.parse(backup);
+        currentBooking = {
+            _id: bookingData.id,
+            doctorName: bookingData.doctorName,
+            doctorSpecialty: 'Specialist',
+            hospital: bookingData.providerName,
+            fee: bookingData.consultationFee,
+            date: bookingData.date,
+            time: bookingData.time,
+            patientName: 'You',
+            patientId: 'N/A',
+            queueNumber: bookingData.queueNumber,
+            estimatedWait: 0
+        };
+        console.log('Using backup booking data:', currentBooking);
+        updateDashboardDisplay();
+        return;
+    }
+    
+    // If no backup, try to fetch from API
     try {
-        console.log('Loading booking details for:', appointmentId);
-        
-        // Fetch appointment from backend API
         const token = localStorage.getItem('authToken');
         const response = await fetch(`/api/appointments/${appointmentId}`, {
             headers: {
@@ -36,7 +58,6 @@ async function loadBookingDetails(appointmentId) {
             const appointment = await response.json();
             console.log('Appointment data:', appointment);
             
-            // Format appointment data for display
             currentBooking = {
                 _id: appointment._id,
                 doctorName: appointment.doctorName,
@@ -52,39 +73,37 @@ async function loadBookingDetails(appointmentId) {
             };
             
             updateDashboardDisplay();
-        } else {
-            // Fallback: use data from sessionStorage if API fails
-            const backup = sessionStorage.getItem('lastBooking');
-            if (backup) {
-                const bookingData = JSON.parse(backup);
-                currentBooking = {
-                    _id: bookingData.id,
-                    doctorName: bookingData.doctorName,
-                    doctorSpecialty: 'Specialist',
-                    hospital: bookingData.providerName,
-                    fee: bookingData.consultationFee,
-                    date: bookingData.date,
-                    time: bookingData.time,
-                    patientName: 'You',
-                    patientId: 'N/A',
-                    queueNumber: bookingData.queueNumber,
-                    estimatedWait: 0
-                };
-                console.log('Using backup booking data:', currentBooking);
-                updateDashboardDisplay();
-            } else {
-                throw new Error('Appointment not found');
-            }
         }
     } catch (error) {
-        console.error('Error loading appointment:', error);
-        window.location.href = 'index.html';
+        console.error('Error fetching appointment from API:', error);
     }
 }
 
 async function loadLatestBooking() {
     try {
-        // Fetch latest bookings from backend
+        // First check sessionStorage for backup
+        const backup = sessionStorage.getItem('lastBooking');
+        if (backup) {
+            const bookingData = JSON.parse(backup);
+            currentBooking = {
+                _id: bookingData.id,
+                doctorName: bookingData.doctorName,
+                doctorSpecialty: 'Specialist',
+                hospital: bookingData.providerName,
+                fee: bookingData.consultationFee,
+                date: bookingData.date,
+                time: bookingData.time,
+                patientName: 'You',
+                patientId: 'N/A',
+                queueNumber: bookingData.queueNumber,
+                estimatedWait: 0
+            };
+            console.log('Using backup booking data from session:', currentBooking);
+            updateDashboardDisplay();
+            return;
+        }
+        
+        // Try to fetch from backend
         const token = localStorage.getItem('authToken');
         const response = await fetch('/api/my-appointments', {
             headers: {
@@ -92,26 +111,25 @@ async function loadLatestBooking() {
             }
         });
         
-        if (!response.ok) {
-            throw new Error('No bookings found');
-        }
-        
-        const bookings = await response.json();
-        if (bookings.length > 0) {
-            currentBooking = bookings[bookings.length - 1];
-            updateDashboardDisplay();
-        } else {
-            throw new Error('No bookings found');
+        if (response.ok) {
+            const bookings = await response.json();
+            if (bookings.length > 0) {
+                currentBooking = bookings[bookings.length - 1];
+                updateDashboardDisplay();
+            }
         }
     } catch (error) {
         console.error('Error loading bookings:', error);
-        alert('No bookings found. Redirecting to home page.');
-        window.location.href = 'index.html';
     }
 }
 
 function updateDashboardDisplay() {
-    if (!currentBooking) return;
+    if (!currentBooking) {
+        console.log('No booking data available');
+        return;
+    }
+    
+    console.log('Updating dashboard with booking:', currentBooking);
     
     // Update doctor information
     document.getElementById('dashboardDoctorName').textContent = currentBooking.doctorName;
