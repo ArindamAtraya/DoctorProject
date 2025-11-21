@@ -463,15 +463,15 @@ function closeQueueInfo() {
     selectedTimeSlot = null;
 }
 
-function confirmBooking() {
+async function confirmBooking() {
     if (!selectedTimeSlot) {
         showNotification('Please select a time slot first.', 'error');
         return;
     }
     
     // Check if user is logged in
-    const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-    if (!currentUser) {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
         showNotification('Please login to book an appointment.', 'error');
         window.location.href = 'index.html';
         return;
@@ -479,56 +479,47 @@ function confirmBooking() {
     
     // Show loading state
     const confirmBtn = document.querySelector('.btn-xl');
-    const originalText = confirmBtn.innerHTML;
     confirmBtn.innerHTML = '<div class="loading"></div> Processing...';
     confirmBtn.disabled = true;
     
-    // Create booking data
-    const bookingData = {
-        doctorId: currentDoctor.id,
-        doctorName: currentDoctor.name,
-        doctorSpecialty: currentDoctor.specialty,
-        hospital: currentDoctor.hospital,
-        date: selectedDate.toISOString().split('T')[0],
-        time: selectedTimeSlot.time,
-        patientId: currentUser.id,
-        patientName: currentUser.name,
-        queuePosition: selectedTimeSlot.queuePosition + 1,
-        estimatedWait: selectedTimeSlot.queuePosition * 15,
-        fee: currentDoctor.fee,
-        bookingTime: new Date().toISOString()
-    };
-    
-    // Simulate API call
-    setTimeout(() => {
-        // Save booking to localStorage (in real app, this would be an API call)
-        const bookingId = saveBooking(bookingData);
+    try {
+        // POST booking to backend API
+        const response = await fetch('/api/appointments', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                doctorId: currentDoctor.id,
+                date: selectedDate.toISOString().split('T')[0],
+                time: selectedTimeSlot.time,
+                notes: ''
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Booking failed');
+        }
+        
+        const result = await response.json();
+        const appointmentId = result.appointment.id;
         
         // Show success message
         showNotification('Appointment booked successfully!', 'success');
         
-        // Redirect to booking dashboard
+        // Redirect to booking dashboard with appointment ID
         setTimeout(() => {
-            window.location.href = `booking-dashboard.html?bookingId=${bookingId}`;
+            window.location.href = `booking-dashboard.html?appointmentId=${appointmentId}`;
         }, 1500);
         
-    }, 2000);
-}
-
-function saveBooking(bookingData) {
-    // Generate unique booking ID
-    bookingData.bookingId = 'BK' + Date.now();
-    
-    // Get existing bookings or initialize empty array
-    const bookings = JSON.parse(localStorage.getItem('patientBookings')) || [];
-    
-    // Add new booking
-    bookings.push(bookingData);
-    
-    // Save back to localStorage
-    localStorage.setItem('patientBookings', JSON.stringify(bookings));
-    
-    return bookingData.bookingId;
+    } catch (error) {
+        console.error('Booking error:', error);
+        showNotification(`Booking failed: ${error.message}`, 'error');
+        confirmBtn.innerHTML = 'Confirm Booking';
+        confirmBtn.disabled = false;
+    }
 }
 
 // Enhanced notification system

@@ -656,6 +656,36 @@ app.post('/api/appointments', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to book appointment after multiple attempts' });
 });
 
+app.get('/api/appointments/:id', authenticateToken, async (req, res) => {
+    try {
+        const appointment = await Appointment.findById(req.params.id)
+            .populate('doctorId')
+            .populate('providerId')
+            .populate('patientId');
+        
+        if (!appointment) {
+            return res.status(404).json({ error: 'Appointment not found' });
+        }
+        
+        res.json({
+            _id: appointment._id,
+            doctorName: appointment.doctorName,
+            providerName: appointment.providerName,
+            patientName: appointment.patientName,
+            patientId: appointment.patientId,
+            date: appointment.date,
+            time: appointment.time,
+            queueNumber: appointment.queueNumber,
+            consultationFee: appointment.consultationFee,
+            paymentStatus: appointment.paymentStatus,
+            status: appointment.status
+        });
+    } catch (error) {
+        console.error('Get appointment error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 app.get('/api/doctor-appointments/:doctorId', async (req, res) => {
     try {
         const { date } = req.query;

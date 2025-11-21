@@ -6,37 +6,53 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 async function initializeBookingDashboard() {
-    // Get booking ID from URL parameters
+    // Get appointment ID from URL parameters
     const urlParams = new URLSearchParams(window.location.search);
-    const bookingId = urlParams.get('bookingId');
+    const appointmentId = urlParams.get('appointmentId');
     
-    if (bookingId) {
-        await loadBookingDetails(bookingId);
+    if (appointmentId) {
+        await loadBookingDetails(appointmentId);
     } else {
-        // If no booking ID, try to get the latest booking from backend
+        // If no appointment ID, try to get the latest booking from backend
         await loadLatestBooking();
     }
 }
 
-async function loadBookingDetails(bookingId) {
+async function loadBookingDetails(appointmentId) {
     try {
-        // Fetch booking from backend API
+        // Fetch appointment from backend API
         const token = localStorage.getItem('authToken');
-        const response = await fetch(`/api/appointments/${bookingId}`, {
+        const response = await fetch(`/api/appointments/${appointmentId}`, {
             headers: {
                 'Authorization': `Bearer ${token}`
             }
         });
         
         if (!response.ok) {
-            throw new Error('Booking not found');
+            throw new Error('Appointment not found');
         }
         
-        currentBooking = await response.json();
+        const appointment = await response.json();
+        
+        // Format appointment data for display
+        currentBooking = {
+            _id: appointment._id,
+            doctorName: appointment.doctorName,
+            doctorSpecialty: appointment.doctorName ? 'Specialty' : 'N/A',
+            hospital: appointment.providerName,
+            fee: appointment.consultationFee,
+            date: appointment.date,
+            time: appointment.time,
+            patientName: appointment.patientName,
+            patientId: appointment.patientId,
+            queueNumber: appointment.queueNumber,
+            estimatedWait: 0
+        };
+        
         updateDashboardDisplay();
     } catch (error) {
-        console.error('Error loading booking:', error);
-        alert('Booking not found. Redirecting to home page.');
+        console.error('Error loading appointment:', error);
+        alert('Appointment not found. Redirecting to home page.');
         window.location.href = 'index.html';
     }
 }
@@ -98,7 +114,7 @@ function updateDashboardDisplay() {
     document.getElementById('dashboardPatientId').textContent = currentBooking.patientId;
     
     // Update queue information
-    document.getElementById('dashboardQueuePosition').textContent = `#${currentBooking.queuePosition}`;
+    document.getElementById('dashboardQueuePosition').textContent = `#${currentBooking.queueNumber}`;
     document.getElementById('dashboardWaitTime').textContent = `${currentBooking.estimatedWait} minutes`;
     
     // Calculate estimated time
@@ -118,8 +134,7 @@ function updateDashboardDisplay() {
 
 function rescheduleAppointment() {
     if (confirm('Do you want to reschedule this appointment?')) {
-        // Redirect to doctor availability page
-        window.location.href = `doctor-availability.html?doctorId=${currentBooking.doctorId}`;
+        alert('Rescheduling feature coming soon!');
     }
 }
 
