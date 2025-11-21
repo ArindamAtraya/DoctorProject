@@ -32,33 +32,52 @@ async function loadBookingDetails(appointmentId) {
         
         console.log('Response status:', response.status);
         
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Appointment not found');
+        if (response.ok) {
+            const appointment = await response.json();
+            console.log('Appointment data:', appointment);
+            
+            // Format appointment data for display
+            currentBooking = {
+                _id: appointment._id,
+                doctorName: appointment.doctorName,
+                doctorSpecialty: 'Specialist',
+                hospital: appointment.providerName,
+                fee: appointment.consultationFee,
+                date: appointment.date,
+                time: appointment.time,
+                patientName: appointment.patientName,
+                patientId: typeof appointment.patientId === 'string' ? appointment.patientId : appointment.patientId._id,
+                queueNumber: appointment.queueNumber,
+                estimatedWait: 0
+            };
+            
+            updateDashboardDisplay();
+        } else {
+            // Fallback: use data from sessionStorage if API fails
+            const backup = sessionStorage.getItem('lastBooking');
+            if (backup) {
+                const bookingData = JSON.parse(backup);
+                currentBooking = {
+                    _id: bookingData.id,
+                    doctorName: bookingData.doctorName,
+                    doctorSpecialty: 'Specialist',
+                    hospital: bookingData.providerName,
+                    fee: bookingData.consultationFee,
+                    date: bookingData.date,
+                    time: bookingData.time,
+                    patientName: 'You',
+                    patientId: 'N/A',
+                    queueNumber: bookingData.queueNumber,
+                    estimatedWait: 0
+                };
+                console.log('Using backup booking data:', currentBooking);
+                updateDashboardDisplay();
+            } else {
+                throw new Error('Appointment not found');
+            }
         }
-        
-        const appointment = await response.json();
-        console.log('Appointment data:', appointment);
-        
-        // Format appointment data for display
-        currentBooking = {
-            _id: appointment._id,
-            doctorName: appointment.doctorName,
-            doctorSpecialty: 'Specialist',
-            hospital: appointment.providerName,
-            fee: appointment.consultationFee,
-            date: appointment.date,
-            time: appointment.time,
-            patientName: appointment.patientName,
-            patientId: appointment.patientId,
-            queueNumber: appointment.queueNumber,
-            estimatedWait: 0
-        };
-        
-        updateDashboardDisplay();
     } catch (error) {
         console.error('Error loading appointment:', error);
-        alert(`Error: ${error.message} - Redirecting to home page.`);
         window.location.href = 'index.html';
     }
 }

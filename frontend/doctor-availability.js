@@ -498,6 +498,8 @@ async function confirmBooking() {
             })
         });
         
+        console.log('POST response status:', response.status);
+        
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.error || 'Booking failed');
@@ -512,6 +514,17 @@ async function confirmBooking() {
         if (!appointmentId) {
             throw new Error('No appointment ID received');
         }
+        
+        // Store appointment data in sessionStorage as backup
+        sessionStorage.setItem('lastBooking', JSON.stringify({
+            id: appointmentId,
+            doctorName: result.appointment.doctorName,
+            providerName: result.appointment.providerName,
+            date: result.appointment.date,
+            time: result.appointment.time,
+            queueNumber: result.appointment.queueNumber,
+            consultationFee: result.appointment.consultationFee
+        }));
         
         // Show success message
         showNotification('Appointment booked successfully!', 'success');
