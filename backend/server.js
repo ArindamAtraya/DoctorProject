@@ -1,3 +1,4 @@
+require('dotenv').config(); // MUST be first line to load .env
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
