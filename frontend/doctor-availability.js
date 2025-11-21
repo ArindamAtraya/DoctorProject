@@ -498,7 +498,7 @@ async function confirmBooking() {
             })
         });
         
-        console.log('POST response status:', response.status);
+        console.log('✅ POST response status:', response.status);
         
         if (!response.ok) {
             const error = await response.json();
@@ -506,7 +506,7 @@ async function confirmBooking() {
         }
         
         const result = await response.json();
-        console.log('Booking result:', result);
+        console.log('✅ Booking result:', result);
         
         // Get appointment ID from response (could be id or _id)
         const appointmentId = result.appointment.id || result.appointment._id;
@@ -515,8 +515,8 @@ async function confirmBooking() {
             throw new Error('No appointment ID received');
         }
         
-        // Store appointment data in sessionStorage as backup
-        sessionStorage.setItem('lastBooking', JSON.stringify({
+        // Store appointment data in localStorage (more reliable than sessionStorage)
+        const bookingData = {
             id: appointmentId,
             doctorName: result.appointment.doctorName,
             providerName: result.appointment.providerName,
@@ -524,18 +524,21 @@ async function confirmBooking() {
             time: result.appointment.time,
             queueNumber: result.appointment.queueNumber,
             consultationFee: result.appointment.consultationFee
-        }));
+        };
+        
+        localStorage.setItem('currentBooking', JSON.stringify(bookingData));
+        console.log('✅ Booking saved to localStorage:', bookingData);
         
         // Show success message
         showNotification('Appointment booked successfully!', 'success');
         
-        // Redirect to booking dashboard with appointment ID
+        // Direct redirect with no query params
         setTimeout(() => {
-            window.location.href = `booking-dashboard.html?appointmentId=${appointmentId}`;
-        }, 1500);
+            window.location.href = 'booking-dashboard.html';
+        }, 1000);
         
     } catch (error) {
-        console.error('Booking error:', error);
+        console.error('❌ Booking error:', error);
         showNotification(`Booking failed: ${error.message}`, 'error');
         confirmBtn.innerHTML = 'Confirm Booking';
         confirmBtn.disabled = false;

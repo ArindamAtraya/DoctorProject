@@ -1,191 +1,141 @@
-// Booking Dashboard JavaScript
-let currentBooking = null;
-
+// Simple Booking Dashboard
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('📊 Booking dashboard loaded');
-    initializeBookingDashboard();
+    loadAndDisplayBooking();
 });
 
-function initializeBookingDashboard() {
-    console.log('🔍 Initializing booking dashboard...');
+function loadAndDisplayBooking() {
+    console.log('Loading booking dashboard...');
     
-    // Get booking data from sessionStorage - THIS IS REQUIRED
-    const backup = sessionStorage.getItem('lastBooking');
-    console.log('✅ Backup available:', !!backup);
+    // Get booking from localStorage
+    const bookingJSON = localStorage.getItem('currentBooking');
     
-    if (!backup) {
-        console.error('❌ NO BOOKING DATA FOUND');
-        document.body.innerHTML = '<div style="text-align:center; padding:50px;"><h2>No appointment found</h2><p>Please book an appointment first.</p><a href="index.html" style="color: #3B82F6; text-decoration: none;">← Go Back to Home</a></div>';
+    if (!bookingJSON) {
+        console.error('No booking found');
+        showErrorAndRedirect('No booking found. Please book an appointment first.');
         return;
     }
     
     try {
-        const bookingData = JSON.parse(backup);
-        console.log('📦 Booking data:', bookingData);
+        const booking = JSON.parse(bookingJSON);
+        console.log('Booking data:', booking);
         
-        currentBooking = {
-            _id: bookingData.id,
-            doctorName: bookingData.doctorName,
-            doctorSpecialty: 'Specialist',
-            hospital: bookingData.providerName,
-            fee: bookingData.consultationFee,
-            date: bookingData.date,
-            time: bookingData.time,
-            patientName: 'You',
-            patientId: 'N/A',
-            queueNumber: bookingData.queueNumber,
-            estimatedWait: 0
-        };
-        
-        console.log('✨ Current booking set:', currentBooking);
-        updateDashboardDisplay();
+        // Display the booking
+        displayBooking(booking);
         
     } catch (error) {
-        console.error('❌ Error parsing booking data:', error);
-        document.body.innerHTML = '<div style="text-align:center; padding:50px;"><h2>Error loading appointment</h2><p>' + error.message + '</p><a href="index.html" style="color: #3B82F6; text-decoration: none;">← Go Back to Home</a></div>';
+        console.error('Error parsing booking:', error);
+        showErrorAndRedirect('Error loading booking data.');
     }
 }
 
-function updateDashboardDisplay() {
-    if (!currentBooking) {
-        console.log('❌ No booking data available');
-        return;
-    }
-    
-    console.log('🎨 Updating dashboard display...');
-    
+function displayBooking(booking) {
     try {
-        // Update all elements safely
-        const updates = [
-            ['dashboardDoctorName', currentBooking.doctorName || 'N/A'],
-            ['dashboardSpecialty', currentBooking.doctorSpecialty || 'Specialist'],
-            ['dashboardHospital', currentBooking.hospital || 'N/A'],
-            ['dashboardFee', `₹${currentBooking.fee || 0}`],
-            ['dashboardDate', new Date(currentBooking.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })],
-            ['dashboardTime', currentBooking.time || 'N/A'],
-            ['dashboardBookingId', currentBooking._id || 'N/A'],
-            ['dashboardPatientName', currentBooking.patientName || 'You'],
-            ['dashboardPatientId', currentBooking.patientId || 'N/A'],
-            ['dashboardQueuePosition', `#${currentBooking.queueNumber || 1}`],
-            ['dashboardWaitTime', `${currentBooking.estimatedWait || 0} minutes`]
-        ];
+        // Update all dashboard elements
+        updateElement('dashboardDoctorName', booking.doctorName);
+        updateElement('dashboardSpecialty', 'Specialist');
+        updateElement('dashboardHospital', booking.providerName);
+        updateElement('dashboardFee', `₹${booking.consultationFee}`);
+        updateElement('dashboardDate', formatDate(booking.date));
+        updateElement('dashboardTime', booking.time);
+        updateElement('dashboardBookingId', booking.id);
+        updateElement('dashboardPatientName', 'You');
+        updateElement('dashboardPatientId', 'N/A');
+        updateElement('dashboardQueuePosition', `#${booking.queueNumber}`);
+        updateElement('dashboardWaitTime', '0 minutes');
+        updateElement('dashboardEstimatedTime', booking.time);
         
-        updates.forEach(([id, value]) => {
-            const el = document.getElementById(id);
-            if (el) {
-                el.textContent = value;
-                console.log(`✅ Updated ${id}: ${value}`);
-            } else {
-                console.warn(`⚠️ Element not found: ${id}`);
-            }
-        });
-        
-        // Calculate estimated time
-        if (currentBooking.time) {
-            try {
-                const timeParts = currentBooking.time.split(':');
-                if (timeParts.length === 2) {
-                    const [hours, minutes] = timeParts.map(Number);
-                    const slotTime = new Date(currentBooking.date);
-                    slotTime.setHours(hours, minutes, 0, 0);
-                    
-                    const estimatedTime = new Date(slotTime.getTime() + (currentBooking.estimatedWait || 0) * 60000);
-                    const estimatedTimeStr = estimatedTime.toLocaleTimeString('en-US', { 
-                        hour: 'numeric', 
-                        minute: '2-digit',
-                        hour12: true 
-                    });
-                    
-                    const estTimeEl = document.getElementById('dashboardEstimatedTime');
-                    if (estTimeEl) {
-                        estTimeEl.textContent = estimatedTimeStr;
-                        console.log(`✅ Updated estimated time: ${estimatedTimeStr}`);
-                    }
-                }
-            } catch (timeError) {
-                console.error('⚠️ Error calculating estimated time:', timeError);
-            }
-        }
-        
-        console.log('✨ Dashboard display updated successfully!');
+        console.log('✅ Dashboard displayed successfully');
         
     } catch (error) {
-        console.error('❌ Error updating dashboard display:', error);
+        console.error('Error displaying booking:', error);
+        showErrorAndRedirect('Error displaying booking information.');
     }
+}
+
+function updateElement(id, value) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.textContent = value;
+    }
+}
+
+function formatDate(dateStr) {
+    try {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('en-US', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+    } catch (e) {
+        return dateStr;
+    }
+}
+
+function showErrorAndRedirect(message) {
+    alert(message);
+    window.location.href = 'index.html';
 }
 
 function rescheduleAppointment() {
-    if (confirm('Do you want to reschedule this appointment?')) {
-        alert('Rescheduling feature coming soon!');
-    }
+    alert('Rescheduling feature coming soon!');
 }
 
 function cancelAppointment() {
-    if (confirm('Are you sure you want to cancel this appointment? This action cannot be undone.')) {
-        alert('Appointment cancelled successfully.');
-        sessionStorage.removeItem('lastBooking');
+    if (confirm('Are you sure you want to cancel this appointment?')) {
+        localStorage.removeItem('currentBooking');
+        alert('Appointment cancelled.');
         window.location.href = 'index.html';
     }
 }
 
 function downloadTicket() {
-    if (!currentBooking) return;
+    const bookingJSON = localStorage.getItem('currentBooking');
+    if (!bookingJSON) return;
     
-    const ticketContent = `
+    const booking = JSON.parse(bookingJSON);
+    const ticketHTML = `
         <!DOCTYPE html>
         <html>
         <head>
             <title>Appointment Ticket</title>
             <style>
-                body { font-family: Arial, sans-serif; padding: 20px; }
+                body { font-family: Arial; padding: 20px; }
                 .ticket { border: 2px solid #000; padding: 20px; max-width: 500px; margin: 0 auto; }
-                .header { text-align: center; margin-bottom: 20px; }
-                .section { margin-bottom: 15px; }
-                .section-title { font-weight: bold; margin-bottom: 5px; }
-                .detail-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
-                .barcode { text-align: center; margin-top: 20px; font-family: 'Courier New', monospace; }
+                .section { margin-bottom: 20px; }
+                .row { display: flex; justify-content: space-between; margin: 10px 0; }
             </style>
         </head>
         <body>
             <div class="ticket">
-                <div class="header">
-                    <h2>HealthConnect</h2>
-                    <h3>Appointment Ticket</h3>
+                <h2 style="text-align:center;">Appointment Ticket</h2>
+                <div class="section">
+                    <h3>Doctor</h3>
+                    <div class="row"><span>Name:</span><strong>${booking.doctorName}</strong></div>
+                    <div class="row"><span>Hospital:</span><strong>${booking.providerName}</strong></div>
                 </div>
                 <div class="section">
-                    <div class="section-title">Appointment Details</div>
-                    <div class="detail-row"><span>Booking ID:</span><span>${currentBooking._id}</span></div>
-                    <div class="detail-row"><span>Date:</span><span>${currentBooking.date}</span></div>
-                    <div class="detail-row"><span>Time:</span><span>${currentBooking.time}</span></div>
-                    <div class="detail-row"><span>Queue Position:</span><span>#${currentBooking.queueNumber}</span></div>
+                    <h3>Appointment</h3>
+                    <div class="row"><span>Date:</span><strong>${booking.date}</strong></div>
+                    <div class="row"><span>Time:</span><strong>${booking.time}</strong></div>
+                    <div class="row"><span>Queue #:</span><strong>${booking.queueNumber}</strong></div>
                 </div>
                 <div class="section">
-                    <div class="section-title">Doctor Information</div>
-                    <div class="detail-row"><span>Doctor:</span><span>${currentBooking.doctorName}</span></div>
-                    <div class="detail-row"><span>Specialty:</span><span>${currentBooking.doctorSpecialty}</span></div>
-                    <div class="detail-row"><span>Hospital:</span><span>${currentBooking.hospital}</span></div>
-                </div>
-                <div class="section">
-                    <div class="section-title">Patient Information</div>
-                    <div class="detail-row"><span>Patient:</span><span>${currentBooking.patientName}</span></div>
-                </div>
-                <div class="barcode">
-                    ${currentBooking._id}
-                    <br>
-                    <small>Scan at reception</small>
+                    <h3>Fee</h3>
+                    <div class="row"><span>Consultation:</span><strong>₹${booking.consultationFee}</strong></div>
                 </div>
             </div>
         </body>
         </html>
     `;
     
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(ticketContent);
-    printWindow.document.close();
-    printWindow.print();
+    const w = window.open();
+    w.document.write(ticketHTML);
+    w.document.close();
+    w.print();
 }
 
 function getPharmacyDirections() {
-    const address = encodeURIComponent('Apollo Hospital, 123 Medical Avenue, City Center');
-    window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank');
+    window.open('https://www.google.com/maps', '_blank');
 }
