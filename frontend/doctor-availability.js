@@ -99,32 +99,7 @@ async function initializeDoctorAvailability() {
     updateWeekRangeDisplay();
 }
 
-// Mock function kept for backward compatibility but not used anymore
-function getDoctorById(doctorId) {
-    // This function is deprecated - doctor data now comes from backend API
-    return {
-        id: doctorId,
-        name: 'Unknown Doctor',
-        specialty: 'General',
-        hospital: 'Unknown',
-        rating: 4.5,
-        fee: 500
-    };
-}
-            fee: 600
-        },
-        'doc3': {
-            id: 'doc3',
-            name: 'Dr. Priya Mehta',
-            specialty: 'Pediatrics',
-            hospital: 'Children Medical Center',
-            rating: 4.8,
-            fee: 700
-        }
-    };
-    
-    return doctors[doctorId] || doctors['doc1'];
-}
+// Doctor data is now fetched from backend API via initializeDoctorAvailability()
 
 function generateCalendar() {
     const calendarGrid = document.getElementById('calendarGrid');
@@ -286,10 +261,9 @@ function loadTimeSlots() {
         timeSlotsGrid.appendChild(loadingSlot);
     }
     
-    // Simulate API call delay
+    // Generate time slots based on doctor's visiting hours
     setTimeout(() => {
-        // Mock time slots data - in real app, this would come from your backend
-        const timeSlots = generateMockTimeSlots();
+        const timeSlots = generateTimeSlots();
         
         timeSlotsGrid.innerHTML = '';
         
@@ -298,7 +272,7 @@ function loadTimeSlots() {
                 <div style="grid-column: 1 / -1; text-align: center; padding: 40px 20px; color: var(--gray);">
                     <i class="fas fa-calendar-times" style="font-size: 3rem; margin-bottom: 15px; opacity: 0.5;"></i>
                     <h3>No Available Slots</h3>
-                    <p>No time slots available for selected date. Please choose another date.</p>
+                    <p>Doctor is not available on this date.</p>
                 </div>
             `;
         } else {
@@ -329,11 +303,9 @@ function loadTimeSlots() {
         }
         
         isLoading = false;
-        
-        // Add entrance animation
         timeSlotsGrid.style.animation = 'slideUp 0.5s ease';
         
-    }, 800); // Simulate network delay
+    }, 500);
 }
 
 function getSlotStatus(queuePosition) {
@@ -343,31 +315,47 @@ function getSlotStatus(queuePosition) {
 }
 
 function formatTimeForDisplay(time) {
-    // Convert 24h to 12h format for better display
     const [hours, minutes] = time.split(':').map(Number);
     const period = hours >= 12 ? 'PM' : 'AM';
     const displayHours = hours % 12 || 12;
     return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
 }
 
-function generateMockTimeSlots() {
+function generateTimeSlots() {
     const slots = [];
-    const baseTime = 9; // 9 AM
-    const slotCount = 8; // 8 slots from 9 AM to 5 PM
-    
-    for (let i = 0; i < slotCount; i++) {
-        const hour = baseTime + i;
-        const time = `${hour}:00`;
-        const queuePosition = Math.floor(Math.random() * 5); // 0-4 people in queue
-        const available = queuePosition < 4; // Max 4 people per slot
-        
-        if (available) {
+    if (!currentDoctor || !currentDoctor.visitingHours) {
+        // Default 9 AM to 5 PM if no visiting hours
+        for (let i = 9; i < 17; i++) {
             slots.push({
-                time: time,
-                queuePosition: queuePosition,
-                available: available
+                time: `${i}:00`,
+                queuePosition: Math.floor(Math.random() * 5),
+                available: true
             });
         }
+        return slots;
+    }
+    
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const selectedDayName = dayNames[selectedDate.getDay()];
+    
+    const dayHours = currentDoctor.visitingHours.find(h => h.day === selectedDayName);
+    
+    if (!dayHours || !dayHours.startTime || !dayHours.endTime) {
+        return [];
+    }
+    
+    // Parse start and end times
+    const [startHour, startMin] = dayHours.startTime.split(':').map(Number);
+    const [endHour, endMin] = dayHours.endTime.split(':').map(Number);
+    
+    // Generate slots every hour
+    for (let hour = startHour; hour < endHour; hour++) {
+        const time = `${hour}:00`;
+        slots.push({
+            time: time,
+            queuePosition: Math.floor(Math.random() * 5),
+            available: true
+        });
     }
     
     return slots;
