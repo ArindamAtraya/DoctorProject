@@ -336,6 +336,18 @@ async function saveDoctor(event) {
     });
     formData.append('degrees', JSON.stringify(degrees));
 
+    const visitingHours = [];
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const daySlots = document.querySelectorAll('.day-slot');
+    daySlots.forEach((slot, index) => {
+        const startTime = slot.querySelector('.visit-start-time').value;
+        const endTime = slot.querySelector('.visit-end-time').value;
+        if (startTime && endTime) {
+            visitingHours.push({ day: days[index], startTime, endTime });
+        }
+    });
+    formData.append('visitingHours', JSON.stringify(visitingHours));
+
     try {
         const url = doctorId ? `${API_BASE}/doctors/${doctorId}` : `${API_BASE}/doctors`;
         const method = doctorId ? 'PUT' : 'POST';

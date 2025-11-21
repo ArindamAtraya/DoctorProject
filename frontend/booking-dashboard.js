@@ -5,41 +5,65 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeBookingDashboard();
 });
 
-function initializeBookingDashboard() {
+async function initializeBookingDashboard() {
     // Get booking ID from URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     const bookingId = urlParams.get('bookingId');
     
     if (bookingId) {
-        loadBookingDetails(bookingId);
+        await loadBookingDetails(bookingId);
     } else {
-        // If no booking ID, try to get the latest booking
-        loadLatestBooking();
+        // If no booking ID, try to get the latest booking from backend
+        await loadLatestBooking();
     }
 }
 
-function loadBookingDetails(bookingId) {
-    // In real app, this would be an API call
-    const bookings = JSON.parse(localStorage.getItem('patientBookings')) || [];
-    currentBooking = bookings.find(booking => booking.bookingId === bookingId);
-    
-    if (!currentBooking) {
-        // If booking not found, show error and redirect
+async function loadBookingDetails(bookingId) {
+    try {
+        // Fetch booking from backend API
+        const token = localStorage.getItem('authToken');
+        const response = await fetch(`/api/appointments/${bookingId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Booking not found');
+        }
+        
+        currentBooking = await response.json();
+        updateDashboardDisplay();
+    } catch (error) {
+        console.error('Error loading booking:', error);
         alert('Booking not found. Redirecting to home page.');
         window.location.href = 'index.html';
-        return;
     }
-    
-    updateDashboardDisplay();
 }
 
-function loadLatestBooking() {
-    const bookings = JSON.parse(localStorage.getItem('patientBookings')) || [];
-    if (bookings.length > 0) {
-        currentBooking = bookings[bookings.length - 1];
-        updateDashboardDisplay();
-    } else {
-        // No bookings found
+async function loadLatestBooking() {
+    try {
+        // Fetch latest bookings from backend
+        const token = localStorage.getItem('authToken');
+        const response = await fetch('/api/my-appointments', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('No bookings found');
+        }
+        
+        const bookings = await response.json();
+        if (bookings.length > 0) {
+            currentBooking = bookings[bookings.length - 1];
+            updateDashboardDisplay();
+        } else {
+            throw new Error('No bookings found');
+        }
+    } catch (error) {
+        console.error('Error loading bookings:', error);
         alert('No bookings found. Redirecting to home page.');
         window.location.href = 'index.html';
     }

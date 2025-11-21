@@ -42,6 +42,14 @@ const doctorSchema = new mongoose.Schema({
         },
         timeSlots: [String]
     }],
+    visitingHours: [{
+        day: {
+            type: String,
+            enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        },
+        startTime: String,
+        endTime: String
+    }],
     about: {
         type: String,
         default: ''

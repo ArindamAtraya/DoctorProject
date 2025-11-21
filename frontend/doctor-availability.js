@@ -63,46 +63,54 @@ function initializeLoadingStates() {
     }
 }
 
-function initializeDoctorAvailability() {
-    // Get doctor info from URL parameters or default
+async function initializeDoctorAvailability() {
+    // Get doctor info from URL parameters
     const urlParams = new URLSearchParams(window.location.search);
-    const doctorId = urlParams.get('doctorId') || 'doc1';
+    const doctorId = urlParams.get('doctorId');
     
-    // In real app, this would be an API call
-    currentDoctor = getDoctorById(doctorId);
+    if (!doctorId) {
+        document.getElementById('doctorName').textContent = 'Doctor not found';
+        return;
+    }
     
-    // Update doctor info with animation
-    setTimeout(() => {
-        document.getElementById('doctorName').textContent = currentDoctor.name;
-        document.getElementById('doctorSpecialty').textContent = currentDoctor.specialty;
-        document.getElementById('doctorHospital').textContent = currentDoctor.hospital;
-        document.getElementById('doctorRating').textContent = currentDoctor.rating;
+    try {
+        // Fetch doctor from backend
+        const response = await fetch(`/api/doctors/${doctorId}`);
+        if (!response.ok) throw new Error('Doctor not found');
         
-        // Add entrance animation
-        document.querySelector('.doctor-header').style.animation = 'slideUp 0.6s ease';
-    }, 300);
+        currentDoctor = await response.json();
+        
+        // Update doctor info with animation
+        setTimeout(() => {
+            document.getElementById('doctorName').textContent = currentDoctor.name;
+            document.getElementById('doctorSpecialty').textContent = currentDoctor.specialty;
+            document.getElementById('doctorHospital').textContent = currentDoctor.hospital;
+            document.getElementById('doctorRating').textContent = currentDoctor.rating || '4.5';
+            
+            // Add entrance animation
+            document.querySelector('.doctor-header').style.animation = 'slideUp 0.6s ease';
+        }, 300);
+    } catch (error) {
+        console.error('Error loading doctor:', error);
+        document.getElementById('doctorName').textContent = 'Error loading doctor';
+    }
     
     // Update week range display
     updateWeekRangeDisplay();
 }
 
+// Mock function kept for backward compatibility but not used anymore
 function getDoctorById(doctorId) {
-    // Mock doctor data - in real app, this would come from your backend
-    const doctors = {
-        'doc1': {
-            id: 'doc1',
-            name: 'Dr. Sarah Wilson',
-            specialty: 'Cardiologist',
-            hospital: 'Apollo Hospital',
-            rating: 4.9,
-            fee: 800
-        },
-        'doc2': {
-            id: 'doc2',
-            name: 'Dr. Raj Sharma',
-            specialty: 'Dermatology',
-            hospital: 'City Hospital',
-            rating: 4.7,
+    // This function is deprecated - doctor data now comes from backend API
+    return {
+        id: doctorId,
+        name: 'Unknown Doctor',
+        specialty: 'General',
+        hospital: 'Unknown',
+        rating: 4.5,
+        fee: 500
+    };
+}
             fee: 600
         },
         'doc3': {

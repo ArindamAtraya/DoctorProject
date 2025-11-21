@@ -418,6 +418,17 @@ app.post('/api/doctors', authenticateToken, requireProvider, upload.single('phot
             }
         }
 
+        let visitingHours = [];
+        const { visitingHours: vhours } = req.body;
+        if (vhours) {
+            try {
+                visitingHours = JSON.parse(vhours);
+            } catch (e) {
+                console.error('Error parsing visiting hours:', e);
+                visitingHours = [];
+            }
+        }
+
         const newDoctor = new Doctor({
             providerId: provider._id,
             name,
@@ -429,6 +440,7 @@ app.post('/api/doctors', authenticateToken, requireProvider, upload.single('phot
             consultationFee: parseInt(consultationFee),
             about: about || '',
             slotsPerDay: parseInt(slotsPerDay) || 10,
+            visitingHours: visitingHours,
             availableSlots: []
         });
 
@@ -457,7 +469,7 @@ app.put('/api/doctors/:id', authenticateToken, requireProvider, upload.single('p
             return res.status(403).json({ error: 'Access denied' });
         }
 
-        const { name, specialty, qualification, experience, consultationFee, about, slotsPerDay, degrees } = req.body;
+        const { name, specialty, qualification, experience, consultationFee, about, slotsPerDay, degrees, visitingHours: vhours } = req.body;
 
         if (req.file) {
             doctor.photo = '/uploads/' + req.file.filename;
@@ -476,6 +488,14 @@ app.put('/api/doctors/:id', authenticateToken, requireProvider, upload.single('p
                 doctor.degrees = JSON.parse(degrees);
             } catch (e) {
                 console.error('Error parsing degrees');
+            }
+        }
+
+        if (vhours) {
+            try {
+                doctor.visitingHours = JSON.parse(vhours);
+            } catch (e) {
+                console.error('Error parsing visiting hours');
             }
         }
 
