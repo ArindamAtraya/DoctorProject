@@ -6,14 +6,43 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 async function initializeBookingDashboard() {
+    console.log('Initializing booking dashboard...');
+    
     // Get appointment ID from URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     const appointmentId = urlParams.get('appointmentId');
     
+    console.log('Appointment ID from URL:', appointmentId);
+    
+    // Always check sessionStorage first for backup data
+    const backup = sessionStorage.getItem('lastBooking');
+    console.log('Backup data available:', !!backup);
+    
+    if (backup) {
+        console.log('Loading from backup...');
+        const bookingData = JSON.parse(backup);
+        currentBooking = {
+            _id: bookingData.id,
+            doctorName: bookingData.doctorName,
+            doctorSpecialty: 'Specialist',
+            hospital: bookingData.providerName,
+            fee: bookingData.consultationFee,
+            date: bookingData.date,
+            time: bookingData.time,
+            patientName: 'You',
+            patientId: 'N/A',
+            queueNumber: bookingData.queueNumber,
+            estimatedWait: 0
+        };
+        console.log('Loaded booking from backup:', currentBooking);
+        updateDashboardDisplay();
+        return;
+    }
+    
+    // If no backup, try to fetch from API
     if (appointmentId) {
         await loadBookingDetails(appointmentId);
     } else {
-        // If no appointment ID, try to get the latest booking from backend
         await loadLatestBooking();
     }
 }
