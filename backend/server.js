@@ -1,3 +1,4 @@
+require('dotenv').config(); // MUST be first line to load .env
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
@@ -330,7 +331,6 @@ app.get('/api/healthcare-providers', async (req, res) => {
         }
 
         if (search) {
-            // Search by name, district, or state
             query.$or = [
                 { name: new RegExp(search, 'i') },
                 { district: new RegExp(search, 'i') },

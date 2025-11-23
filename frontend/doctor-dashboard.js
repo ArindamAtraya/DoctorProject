@@ -1,417 +1,474 @@
-// Doctor Dashboard JavaScript
-let currentUser = JSON.parse(localStorage.getItem('currentUser')) || {
-    name: 'Dr. Sarah Wilson',
-    role: 'Cardiologist',
-    email: 'sarah.wilson@hospital.com'
-};
+// Doctor Availability JavaScript - Enhanced with Mobile Support
+const API_BASE = 'http://localhost:5000/api';
+let currentDate = new Date();
+let selectedDate = new Date();
+let selectedTimeSlot = null;
+let currentDoctor = null;
+let isLoading = false;
 
-// Initialize Dashboard
+// Initialize the page with enhanced features
 document.addEventListener('DOMContentLoaded', function() {
-    initializeDashboard();
-    loadDashboardData();
+    initializeDoctorAvailability();
+    generateCalendar();
+    loadTimeSlots();
+    initializeMobileFeatures();
 });
 
-function initializeDashboard() {
-    // Set user info
-    document.getElementById('userName').textContent = currentUser.name;
-    document.getElementById('userRole').textContent = currentUser.role;
-    document.getElementById('greetingName').textContent = currentUser.name.split(' ')[1];
+// Mobile features initialization
+function initializeMobileFeatures() {
+    initializeTouchInteractions();
+    setViewportHeight();
+    window.addEventListener('resize', setViewportHeight);
+    initializeLoadingStates();
+}
 
-    // Navigation
-    document.querySelectorAll('.nav-link').forEach(link => {
-        link.addEventListener('click', function(e) {
-            e.preventDefault();
-            const section = this.getAttribute('data-section');
-            switchSection(section);
-            
-            // Update active nav
-            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-            this.classList.add('active');
-        });
+function setViewportHeight() {
+    let vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty('--vh', `${vh}px`);
+}
+
+function initializeTouchInteractions() {
+    const touchElements = document.querySelectorAll('.calendar-day, .time-slot-card, .btn');
+    touchElements.forEach(element => {
+        element.addEventListener('touchstart', function() {
+            this.classList.add('touch-active');
+        }, { passive: true });
+        element.addEventListener('touchend', function() {
+            this.classList.remove('touch-active');
+        }, { passive: true });
     });
+}
 
-    // Menu toggle for mobile
-    document.getElementById('menuToggle').addEventListener('click', function() {
-        document.getElementById('sidebar').classList.toggle('active');
-    });
-
-    // Logout
-    document.getElementById('logoutBtn').addEventListener('click', function(e) {
-        e.preventDefault();
-        if (confirm('Are you sure you want to logout?')) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('currentUser');
-            window.location.href = 'index.html';
+function initializeLoadingStates() {
+    const timeSlotsGrid = document.getElementById('timeSlotsGrid');
+    if (timeSlotsGrid) {
+        timeSlotsGrid.innerHTML = '';
+        for (let i = 0; i < 6; i++) {
+            const loadingSlot = document.createElement('div');
+            loadingSlot.className = 'time-slot-card loading-slot';
+            loadingSlot.innerHTML = `
+                <div class="time-slot-time" style="color: transparent;">Loading</div>
+                <div class="time-slot-queue" style="color: transparent;">Loading</div>
+            `;
+            timeSlotsGrid.appendChild(loadingSlot);
         }
-    });
-
-    // Modal controls
-    document.querySelectorAll('.close-modal').forEach(btn => {
-        btn.addEventListener('click', closeAllModals);
-    });
-
-    // Generate calendar
-    generateCalendar();
-    generateWeeklySchedule();
-}
-
-function switchSection(section) {
-    // Hide all sections
-    document.querySelectorAll('.dashboard-section').forEach(sec => {
-        sec.classList.remove('active');
-    });
-
-    // Show selected section
-    document.getElementById(`${section}-section`).classList.add('active');
-    
-    // Load section-specific data
-    loadSectionData(section);
-}
-
-function loadSectionData(section) {
-    switch(section) {
-        case 'appointments':
-            loadAllAppointments();
-            break;
-        case 'patients':
-            loadPatients();
-            break;
-        case 'prescriptions':
-            loadPrescriptions();
-            break;
-        case 'schedule':
-            generateWeeklySchedule();
-            break;
     }
 }
 
-function loadDashboardData() {
-    // Load today's appointments
-    loadTodaysAppointments();
+async function initializeDoctorAvailability() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const doctorId = urlParams.get('doctorId');
     
-    // Load all appointments
-    loadAllAppointments();
+    if (!doctorId) {
+        document.getElementById('doctorName').textContent = 'Doctor not found';
+        return;
+    }
     
-    // Load patients
-    loadPatients();
+    try {
+        const response = await fetch(`${API_BASE}/doctors/${doctorId}`);
+        if (!response.ok) throw new Error('Doctor not found');
+        
+        currentDoctor = await response.json();
+        console.log('✅ Doctor loaded:', currentDoctor);
+        
+        setTimeout(() => {
+            document.getElementById('doctorName').textContent = currentDoctor.name;
+            document.getElementById('doctorSpecialty').textContent = currentDoctor.specialty;
+            document.getElementById('doctorHospital').textContent = currentDoctor.hospital;
+            document.getElementById('doctorRating').textContent = currentDoctor.rating || '4.5';
+            document.querySelector('.doctor-header').style.animation = 'slideUp 0.6s ease';
+        }, 300);
+    } catch (error) {
+        console.error('Error loading doctor:', error);
+        document.getElementById('doctorName').textContent = 'Error loading doctor';
+    }
     
-    // Load prescriptions
-    loadPrescriptions();
-    
-    // Update stats
-    updateDashboardStats();
-}
-
-function loadTodaysAppointments() {
-    const appointments = [
-        {
-            id: 'A001',
-            patient: 'John Doe',
-            time: '09:00 AM',
-            status: 'confirmed',
-            type: 'Consultation'
-        },
-        {
-            id: 'A002',
-            patient: 'Jane Smith',
-            time: '10:30 AM',
-            status: 'pending',
-            type: 'Follow-up'
-        },
-        {
-            id: 'A003',
-            patient: 'Mike Johnson',
-            time: '02:15 PM',
-            status: 'confirmed',
-            type: 'Emergency'
-        }
-    ];
-
-    const container = document.getElementById('todayAppointmentsList');
-    container.innerHTML = '';
-
-    appointments.forEach(apt => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${apt.patient}</td>
-            <td>${apt.time}</td>
-            <td><span class="status-badge status-${apt.status}">${apt.status}</span></td>
-            <td>
-                <div class="action-buttons">
-                    <button class="btn btn-primary btn-sm" onclick="viewAppointment('${apt.id}')">View</button>
-                    <button class="btn btn-outline btn-sm" onclick="editAppointment('${apt.id}')">Edit</button>
-                </div>
-            </td>
-        `;
-        container.appendChild(row);
-    });
-}
-
-function loadAllAppointments() {
-    const appointments = [
-        {
-            id: 'A001',
-            patient: 'John Doe',
-            date: '2023-10-20',
-            time: '09:00 AM',
-            type: 'Consultation',
-            status: 'confirmed'
-        },
-        {
-            id: 'A002', 
-            patient: 'Jane Smith',
-            date: '2023-10-20',
-            time: '10:30 AM',
-            type: 'Follow-up',
-            status: 'pending'
-        },
-        {
-            id: 'A003',
-            patient: 'Mike Johnson',
-            date: '2023-10-21',
-            time: '11:00 AM',
-            type: 'Checkup',
-            status: 'confirmed'
-        }
-    ];
-
-    const container = document.getElementById('appointmentsList');
-    container.innerHTML = '';
-
-    appointments.forEach(apt => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${apt.id}</td>
-            <td>${apt.patient}</td>
-            <td>${apt.date} at ${apt.time}</td>
-            <td>${apt.type}</td>
-            <td><span class="status-badge status-${apt.status}">${apt.status}</span></td>
-            <td>
-                <div class="action-buttons">
-                    <button class="btn btn-primary btn-sm" onclick="viewAppointment('${apt.id}')">View</button>
-                    <button class="btn btn-outline btn-sm" onclick="editAppointment('${apt.id}')">Edit</button>
-                </div>
-            </td>
-        `;
-        container.appendChild(row);
-    });
-}
-
-function loadPatients() {
-    const patients = [
-        {
-            id: 'P001',
-            name: 'John Doe',
-            phone: '+1 234-567-8900',
-            lastVisit: '2023-10-15',
-            history: 'Hypertension'
-        },
-        {
-            id: 'P002',
-            name: 'Jane Smith', 
-            phone: '+1 234-567-8901',
-            lastVisit: '2023-10-10',
-            history: 'Diabetes'
-        },
-        {
-            id: 'P003',
-            name: 'Mike Johnson',
-            phone: '+1 234-567-8902',
-            lastVisit: '2023-10-18',
-            history: 'Asthma'
-        }
-    ];
-
-    const container = document.getElementById('patientsList');
-    container.innerHTML = '';
-
-    patients.forEach(patient => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${patient.id}</td>
-            <td>${patient.name}</td>
-            <td>${patient.phone}</td>
-            <td>${patient.lastVisit}</td>
-            <td>${patient.history}</td>
-            <td>
-                <div class="action-buttons">
-                    <button class="btn btn-primary btn-sm" onclick="viewPatient('${patient.id}')">View</button>
-                    <button class="btn btn-outline btn-sm" onclick="viewPatientHistory('${patient.id}')">History</button>
-                </div>
-            </td>
-        `;
-        container.appendChild(row);
-    });
-}
-
-function loadPrescriptions() {
-    const prescriptions = [
-        {
-            id: 'RX20231020001',
-            patient: 'John Doe',
-            date: '2023-10-20',
-            medications: ['Paracetamol', 'Ibuprofen'],
-            status: 'active'
-        },
-        {
-            id: 'RX20231019001',
-            patient: 'Jane Smith',
-            date: '2023-10-19',
-            medications: ['Amoxicillin'],
-            status: 'completed'
-        }
-    ];
-
-    const container = document.getElementById('prescriptionsList');
-    if (!container) return;
-
-    container.innerHTML = '';
-
-    prescriptions.forEach(prescription => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${prescription.id}</td>
-            <td>${prescription.patient}</td>
-            <td>${prescription.date}</td>
-            <td>${prescription.medications.join(', ')}</td>
-            <td><span class="status-badge status-${prescription.status}">${prescription.status}</span></td>
-            <td>
-                <div class="action-buttons">
-                    <button class="btn btn-primary btn-sm" onclick="viewPrescription('${prescription.id}')">View</button>
-                    <button class="btn btn-outline btn-sm" onclick="printPrescription('${prescription.id}')">Print</button>
-                </div>
-            </td>
-        `;
-        container.appendChild(row);
-    });
-}
-
-function updateDashboardStats() {
-    // Update stats cards with real data
-    document.getElementById('totalAppointments').textContent = '12';
-    document.getElementById('todayAppointments').textContent = '5';
-    document.getElementById('pendingAppointments').textContent = '3';
-    document.getElementById('totalEarnings').textContent = '8,400';
+    updateWeekRangeDisplay();
 }
 
 function generateCalendar() {
     const calendarGrid = document.getElementById('calendarGrid');
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    calendarGrid.innerHTML = '';
     
-    // Add day headers
-    days.forEach(day => {
-        const dayHeader = document.createElement('div');
-        dayHeader.className = 'calendar-day';
-        dayHeader.style.fontWeight = '600';
-        dayHeader.textContent = day;
-        calendarGrid.appendChild(dayHeader);
-    });
+    const startOfWeek = new Date(currentDate);
+    startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+    
+    for (let i = 0; i < 7; i++) {
+        const dayDate = new Date(startOfWeek);
+        dayDate.setDate(startOfWeek.getDate() + i);
+        
+        const dayElement = document.createElement('div');
+        dayElement.className = 'calendar-day';
+        
+        const today = new Date();
+        if (dayDate.toDateString() === today.toDateString()) {
+            dayElement.classList.add('active');
+        }
+        
+        const hasAvailability = Math.random() > 0.3;
+        if (hasAvailability) {
+            dayElement.classList.add('available');
+        }
+        
+        const dateNumber = document.createElement('div');
+        dateNumber.textContent = dayDate.getDate();
+        dateNumber.style.fontSize = '1.1rem';
+        dateNumber.style.fontWeight = '600';
+        dayElement.appendChild(dateNumber);
+        
+        if (window.innerWidth <= 768) {
+            const monthAbbr = document.createElement('div');
+            monthAbbr.textContent = dayDate.toLocaleDateString('en-US', { month: 'short' });
+            monthAbbr.style.fontSize = '0.7rem';
+            monthAbbr.style.opacity = '0.7';
+            monthAbbr.style.marginTop = '2px';
+            dayElement.appendChild(monthAbbr);
+        }
+        
+        dayElement.setAttribute('data-date', dayDate.toISOString().split('T')[0]);
+        dayElement.addEventListener('click', function() {
+            if (!isLoading) selectDate(this.getAttribute('data-date'));
+        });
+        
+        calendarGrid.appendChild(dayElement);
+    }
+    
+    updateWeekRangeDisplay();
+}
 
-    // Add calendar days (simplified)
-    for (let i = 1; i <= 31; i++) {
-        const day = document.createElement('div');
-        day.className = 'calendar-day';
-        day.textContent = i;
-        
-        // Mark some days as having appointments
-        if ([5, 12, 19, 26].includes(i)) {
-            day.classList.add('has-appointment');
-        }
-        
-        if (i === 20) {
+function updateWeekRangeDisplay() {
+    const startOfWeek = new Date(currentDate);
+    startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    
+    const options = { month: 'short', day: 'numeric' };
+    const startStr = startOfWeek.toLocaleDateString('en-US', options);
+    const endStr = endOfWeek.toLocaleDateString('en-US', options);
+    
+    let displayText = `${startStr} - ${endStr}, ${currentDate.getFullYear()}`;
+    if (window.innerWidth <= 480) {
+        displayText = `${startStr} - ${endStr}`;
+    }
+    
+    document.getElementById('currentWeekRange').textContent = displayText;
+}
+
+function previousWeek() {
+    if (isLoading) return;
+    currentDate.setDate(currentDate.getDate() - 7);
+    generateCalendar();
+    loadTimeSlots();
+}
+
+function nextWeek() {
+    if (isLoading) return;
+    currentDate.setDate(currentDate.getDate() + 7);
+    generateCalendar();
+    loadTimeSlots();
+}
+
+function selectDate(dateString) {
+    if (isLoading) return;
+    selectedDate = new Date(dateString);
+    
+    document.querySelectorAll('.calendar-day').forEach(day => {
+        day.classList.remove('active');
+        if (day.getAttribute('data-date') === dateString) {
             day.classList.add('active');
+            day.style.animation = 'pulse 0.5s ease';
+        }
+    });
+    
+    const options = { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' };
+    let displayText = selectedDate.toLocaleDateString('en-US', options);
+    if (window.innerWidth <= 480) {
+        const mobileOptions = { weekday: 'short', month: 'short', day: 'numeric' };
+        displayText = selectedDate.toLocaleDateString('en-US', mobileOptions);
+    }
+    
+    document.getElementById('selectedDateDisplay').textContent = displayText;
+    loadTimeSlots();
+}
+
+async function loadTimeSlots() {
+    if (isLoading) return;
+    isLoading = true;
+    const timeSlotsGrid = document.getElementById('timeSlotsGrid');
+    
+    timeSlotsGrid.innerHTML = '';
+    for (let i = 0; i < 6; i++) {
+        const loadingSlot = document.createElement('div');
+        loadingSlot.className = 'time-slot-card loading-slot';
+        loadingSlot.innerHTML = `
+            <div class="time-slot-time" style="color: transparent;">Loading</div>
+            <div class="time-slot-queue" style="color: transparent;">Loading</div>
+        `;
+        timeSlotsGrid.appendChild(loadingSlot);
+    }
+    
+    try {
+        const timeSlots = await generateTimeSlots();
+        timeSlotsGrid.innerHTML = '';
+        
+        if (timeSlots.length === 0) {
+            timeSlotsGrid.innerHTML = `
+                <div style="grid-column: 1 / -1; text-align: center; padding: 40px 20px; color: var(--gray);">
+                    <i class="fas fa-calendar-times" style="font-size: 3rem; margin-bottom: 15px; opacity: 0.5;"></i>
+                    <h3>No Available Slots</h3>
+                    <p>Doctor is not available on this date.</p>
+                </div>
+            `;
+        } else {
+            timeSlots.forEach(slot => {
+                const slotElement = document.createElement('div');
+                slotElement.className = 'time-slot-card';
+                slotElement.setAttribute('data-time', slot.time);
+                slotElement.setAttribute('data-queue', slot.queuePosition);
+                
+                const statusElement = document.createElement('div');
+                statusElement.className = `slot-status ${getSlotStatus(slot.queuePosition)}`;
+                slotElement.appendChild(statusElement);
+                
+                slotElement.innerHTML += `
+                    <div class="time-slot-time">${formatTimeForDisplay(slot.time)}</div>
+                    <div class="time-slot-queue">${slot.queuePosition} in queue</div>
+                `;
+                
+                slotElement.addEventListener('click', function() {
+                    if (!isLoading) selectTimeSlot(this);
+                });
+                
+                timeSlotsGrid.appendChild(slotElement);
+            });
         }
         
-        calendarGrid.appendChild(day);
+        isLoading = false;
+    } catch (error) {
+        console.error('Error loading time slots:', error);
+        timeSlotsGrid.innerHTML = '<p>Error loading time slots. Please try again.</p>';
+        isLoading = false;
     }
 }
 
-function generateWeeklySchedule() {
-    const scheduleGrid = document.getElementById('weeklySchedule');
-    if (!scheduleGrid) return;
+function getSlotStatus(queuePosition) {
+    if (queuePosition === 0) return 'slot-available';
+    if (queuePosition <= 2) return 'slot-busy';
+    return 'slot-full';
+}
 
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    const timeSlots = ['09:00', '10:00', '11:00', '12:00', '14:00', '15:00', '16:00', '17:00'];
+function formatTimeForDisplay(time) {
+    const [hours, minutes] = time.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+}
 
-    // Create schedule grid
-    scheduleGrid.innerHTML = `
-        <div class="time-column">
-            <div class="time-header">Time</div>
-            ${timeSlots.map(time => `<div class="time-slot">${time}</div>`).join('')}
-        </div>
-        ${days.map(day => `
-            <div class="day-column">
-                <div class="day-header">${day}</div>
-                ${timeSlots.map(time => `<div class="time-slot" data-day="${day}" data-time="${time}"></div>`).join('')}
-            </div>
-        `).join('')}
-    `;
-
-    // Add some sample appointments
-    const appointments = [
-        { day: 'Monday', time: '10:00', patient: 'John Doe', type: 'consultation' },
-        { day: 'Wednesday', time: '14:00', patient: 'Jane Smith', type: 'follow-up' },
-        { day: 'Friday', time: '11:00', patient: 'Mike Johnson', type: 'emergency' }
-    ];
-
-    appointments.forEach(apt => {
-        const slot = scheduleGrid.querySelector(`[data-day="${apt.day}"][data-time="${apt.time}"]`);
-        if (slot) {
-            slot.innerHTML = `
-                <div class="appointment-slot" style="background: var(--primary); color: white; padding: 5px; border-radius: 4px; font-size: 0.8rem;">
-                    ${apt.patient}
-                </div>
-            `;
+async function generateTimeSlots() {
+    const slots = [];
+    if (!currentDoctor || !currentDoctor.visitingHours) {
+        for (let i = 9; i < 17; i++) {
+            slots.push({ time: `${i}:00`, queuePosition: 0, available: true });
         }
+        return slots;
+    }
+    
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const selectedDayName = dayNames[selectedDate.getDay()];
+    const dayHours = currentDoctor.visitingHours.find(h => h.day === selectedDayName);
+    
+    if (!dayHours || !dayHours.startTime || !dayHours.endTime) {
+        return [];
+    }
+    
+    try {
+        const dateString = selectedDate.toISOString().split('T')[0];
+        const doctorId = currentDoctor._id || currentDoctor.id;
+        const response = await fetch(`${API_BASE}/doctor-appointments/${doctorId}?date=${dateString}`);
+        const appointments = response.ok ? await response.json() : [];
+        
+        const [startHour] = dayHours.startTime.split(':').map(Number);
+        const [endHour] = dayHours.endTime.split(':').map(Number);
+        
+        for (let hour = startHour; hour < endHour; hour++) {
+            const time = `${hour}:00`;
+            const bookingsForSlot = appointments.filter(apt => apt.time === time).length;
+            slots.push({ time: time, queuePosition: bookingsForSlot, available: true });
+        }
+    } catch (error) {
+        console.error('Error fetching appointments:', error);
+        const [startHour] = dayHours.startTime.split(':').map(Number);
+        const [endHour] = dayHours.endTime.split(':').map(Number);
+        for (let hour = startHour; hour < endHour; hour++) {
+            slots.push({ time: `${hour}:00`, queuePosition: 0, available: true });
+        }
+    }
+    
+    return slots;
+}
+
+function selectTimeSlot(slotElement) {
+    if (isLoading) return;
+    
+    document.querySelectorAll('.time-slot-card').forEach(slot => {
+        slot.classList.remove('selected');
     });
+    
+    slotElement.classList.add('selected');
+    slotElement.style.animation = 'pulse 0.3s ease';
+    
+    selectedTimeSlot = {
+        time: slotElement.getAttribute('data-time'),
+        queuePosition: parseInt(slotElement.getAttribute('data-queue'))
+    };
+    
+    showQueueInfo();
 }
 
-function showNewAppointmentModal() {
-    document.getElementById('newAppointmentModal').style.display = 'flex';
+function showQueueInfo() {
+    if (!selectedTimeSlot) return;
+    
+    const queueInfoPanel = document.getElementById('queueInfoPanel');
+    const patientsBefore = selectedTimeSlot.queuePosition;
+    const estimatedWait = patientsBefore * 15;
+    
+    const [hours, minutes] = selectedTimeSlot.time.split(':').map(Number);
+    const slotTime = new Date(selectedDate);
+    slotTime.setHours(hours, minutes, 0, 0);
+    
+    const estimatedTime = new Date(slotTime.getTime() + estimatedWait * 60000);
+    const estimatedTimeStr = estimatedTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    
+    document.getElementById('queuePosition').textContent = `#${patientsBefore + 1}`;
+    document.getElementById('patientsBefore').textContent = patientsBefore;
+    document.getElementById('estimatedWait').textContent = `${estimatedWait} minutes`;
+    document.getElementById('estimatedTime').textContent = estimatedTimeStr;
+    
+    queueInfoPanel.classList.add('active');
+    
+    if (window.innerWidth <= 768) {
+        setTimeout(() => {
+            queueInfoPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+        }, 300);
+    }
 }
 
-function closeAllModals() {
-    document.querySelectorAll('.modal').forEach(modal => {
-        modal.style.display = 'none';
+function closeQueueInfo() {
+    const queueInfoPanel = document.getElementById('queueInfoPanel');
+    queueInfoPanel.classList.remove('active');
+    document.querySelectorAll('.time-slot-card').forEach(slot => {
+        slot.classList.remove('selected');
     });
+    selectedTimeSlot = null;
 }
 
-function viewAppointment(appointmentId) {
-    alert(`View appointment ${appointmentId}`);
-    // Implement view appointment functionality
+async function confirmBooking() {
+    console.log('🎯 confirmBooking called!');
+    
+    if (!selectedTimeSlot) {
+        console.log('❌ No time slot selected');
+        showNotification('Please select a time slot first.', 'error');
+        return;
+    }
+    
+    const token = localStorage.getItem('authToken');
+    console.log('🔑 Token:', token ? 'YES' : 'NO');
+    
+    if (!token) {
+        showNotification('Please login to book an appointment.', 'error');
+        window.location.href = 'index.html';
+        return;
+    }
+    
+    const confirmBtn = document.querySelector('.btn-xl');
+    confirmBtn.innerHTML = '<div class="loading"></div> Processing...';
+    confirmBtn.disabled = true;
+    
+    try {
+        const doctorId = currentDoctor._id || currentDoctor.id;
+        const date = selectedDate.toISOString().split('T')[0];
+        const time = selectedTimeSlot.time;
+        
+        console.log('📤 Sending:', { doctorId, date, time, API_BASE });
+        
+        const response = await fetch(`${API_BASE}/appointments`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ doctorId, date, time, notes: '' })
+        });
+        
+        console.log('📊 Response:', response.status, response.ok);
+        const result = await response.json();
+        console.log('📥 Data:', result);
+        
+        if (!response.ok) {
+            throw new Error(result.error || `HTTP ${response.status}`);
+        }
+        
+        // Save booking to localStorage
+        const bookingData = {
+            id: result.appointment.id || result.appointment._id,
+            doctorName: result.appointment.doctorName || currentDoctor.name,
+            providerName: result.appointment.providerName || currentDoctor.hospital,
+            date: result.appointment.date,
+            time: result.appointment.time,
+            queueNumber: result.appointment.queueNumber,
+            consultationFee: result.appointment.consultationFee || currentDoctor.consultationFee
+        };
+        
+        console.log('💾 Saving:', bookingData);
+        localStorage.setItem('currentBooking', JSON.stringify(bookingData));
+        console.log('✅ Saved to localStorage');
+        
+        showNotification('Appointment booked successfully!', 'success');
+        
+        setTimeout(() => {
+            console.log('🔗 Redirecting...');
+            window.location.href = 'booking-dashboard.html';
+        }, 800);
+        
+    } catch (error) {
+        console.error('❌ ERROR:', error);
+        showNotification(`Booking failed: ${error.message}`, 'error');
+        confirmBtn.innerHTML = 'Confirm Booking';
+        confirmBtn.disabled = false;
+    }
 }
 
-function editAppointment(appointmentId) {
-    alert(`Edit appointment ${appointmentId}`);
-    // Implement edit appointment functionality
+function showNotification(message, type = 'info') {
+    const existing = document.querySelectorAll('.notification');
+    existing.forEach(n => n.remove());
+
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+        <span>${message}</span>
+    `;
+    
+    document.body.appendChild(notification);
+    setTimeout(() => notification.classList.add('show'), 100);
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => notification.remove(), 400);
+    }, 5000);
 }
 
-function viewPatient(patientId) {
-    alert(`View patient ${patientId}`);
-    // Implement view patient functionality
-}
-
-function viewPatientHistory(patientId) {
-    alert(`View patient history ${patientId}`);
-    // Implement view patient history functionality
-}
-
-function viewPrescription(prescriptionId) {
-    alert(`View prescription ${prescriptionId}`);
-    // Implement view prescription functionality
-}
-
-function printPrescription(prescriptionId) {
-    alert(`Print prescription ${prescriptionId}`);
-    // Implement print prescription functionality
-}
-
-function showNewPatientModal() {
-    alert('Open new patient modal');
-    // Implement new patient modal
-}
-
-function showScheduleModal() {
-    alert('Open schedule editor modal');
-    // Implement schedule editor modal
-}
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .touch-active { transform: scale(0.95); }
+    #queuePosition, #doctorSpecialty { color: white !important; }
+`;
+document.head.appendChild(style);

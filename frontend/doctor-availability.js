@@ -1,4 +1,5 @@
 // Doctor Availability JavaScript - Enhanced with Mobile Support
+const API_BASE = 'http://localhost:5000/api';
 let currentDate = new Date();
 let selectedDate = new Date();
 let selectedTimeSlot = null;
@@ -75,10 +76,11 @@ async function initializeDoctorAvailability() {
     
     try {
         // Fetch doctor from backend
-        const response = await fetch(`/api/doctors/${doctorId}`);
+        const response = await fetch(`${API_BASE}/doctors/${doctorId}`);
         if (!response.ok) throw new Error('Doctor not found');
         
         currentDoctor = await response.json();
+        console.log('✅ Doctor loaded:', currentDoctor);
         
         // Update doctor info with animation
         setTimeout(() => {
@@ -350,7 +352,8 @@ async function generateTimeSlots() {
     // Fetch real appointments for this doctor on this date
     try {
         const dateString = selectedDate.toISOString().split('T')[0];
-        const response = await fetch(`/api/doctor-appointments/${currentDoctor.id}?date=${dateString}`);
+        const doctorId = currentDoctor._id || currentDoctor.id;
+        const response = await fetch(`${API_BASE}/doctor-appointments/${doctorId}?date=${dateString}`);
         const appointments = response.ok ? await response.json() : [];
         
         // Parse start and end times
@@ -484,14 +487,15 @@ async function confirmBooking() {
     
     try {
         // POST booking to backend API
-        const response = await fetch('/api/appointments', {
+        const doctorId = currentDoctor._id || currentDoctor.id;
+        const response = await fetch(`${API_BASE}/appointments`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
-                doctorId: currentDoctor.id,
+                doctorId: doctorId,
                 date: selectedDate.toISOString().split('T')[0],
                 time: selectedTimeSlot.time,
                 notes: ''

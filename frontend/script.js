@@ -1,5 +1,5 @@
 // API Base URL - Use relative path for same origin
-const API_BASE = '/api';
+const API_BASE = 'http://localhost:5000/api';
 
 // Global State
 let currentUser = null;
