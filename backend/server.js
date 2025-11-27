@@ -33,6 +33,7 @@ async function startServer() {
         console.log('   GET  /api/healthcare-providers');
         console.log('   POST /api/appointments');
         console.log('   GET  /api/provider-appointments');
+        console.log('   GET  /api/all-doctors-with-providers');
     });
 }
 
@@ -55,6 +56,7 @@ const upload = multer({ storage: storage });
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../frontend')));
+app.use('/uploads', express.static(path.join(__dirname, '../frontend/uploads')));
 
 function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
@@ -112,6 +114,10 @@ app.get('/provider-dashboard.html', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/provider-dashboard.html'));
 });
 
+app.get('/appointment-history.html', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/appointment-history.html'));
+});
+
 app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'OK', 
@@ -124,9 +130,12 @@ app.get('/api/health', (req, res) => {
 app.post('/api/auth/register', async (req, res) => {
     try {
         const { name, email, password, phone, role = 'patient', providerInfo } = req.body;
+        
+        console.log('🔐 REGISTRATION ATTEMPT:', { email, role, hasProviderInfo: !!providerInfo });
 
         const existingUser = await User.findOne({ email });
         if (existingUser) {
+            console.log('❌ User already exists:', email);
             return res.status(400).json({ error: 'User already exists with this email' });
         }
 
@@ -142,6 +151,7 @@ app.post('/api/auth/register', async (req, res) => {
         });
 
         await user.save();
+        console.log('✅ User created:', { id: user._id, email: user.email, role: user.role });
 
         if (['pharmacy', 'clinic', 'hospital'].includes(role)) {
             const provider = new HealthcareProvider({
@@ -157,6 +167,7 @@ app.post('/api/auth/register', async (req, res) => {
                 facilities: getDefaultFacilities(role)
             });
             await provider.save();
+            console.log('✅ Healthcare provider created:', { userId: user._id, type: role });
         }
 
         const token = jwt.sign(
@@ -164,6 +175,8 @@ app.post('/api/auth/register', async (req, res) => {
             JWT_SECRET,
             { expiresIn: '24h' }
         );
+        
+        console.log('✅ Token generated with role:', user.role);
 
         res.json({
             token,
@@ -177,8 +190,8 @@ app.post('/api/auth/register', async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Registration error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error('❌ Registration error:', error);
+        res.status(500).json({ error: 'Internal server error: ' + error.message });
     }
 });
 
@@ -278,6 +291,7 @@ app.get('/api/doctors', async (req, res) => {
             hospital: doctor.providerId ? doctor.providerId.name : 'N/A',
             providerId: doctor.providerId ? doctor.providerId._id : null,
             providerType: doctor.providerId ? doctor.providerId.type : null,
+            providerDistrict: doctor.providerId ? doctor.providerId.district : 'N/A',
             rating: doctor.providerId ? doctor.providerId.rating : 4.5,
             reviews: doctor.providerId ? doctor.providerId.totalReviews : 0,
             availability: 'Available'
@@ -286,6 +300,46 @@ app.get('/api/doctors', async (req, res) => {
         res.json(formattedDoctors);
     } catch (error) {
         console.error('Get doctors error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.get('/api/all-doctors-with-providers', async (req, res) => {
+    try {
+        const doctors = await Doctor.find().populate('providerId');
+        
+        const grouped = {};
+        
+        doctors.forEach(doctor => {
+            if (doctor.providerId) {
+                const key = `${doctor.providerId._id}`;
+                if (!grouped[key]) {
+                    grouped[key] = {
+                        providerId: doctor.providerId._id,
+                        providerName: doctor.providerId.name,
+                        providerType: doctor.providerId.type,
+                        providerDistrict: doctor.providerId.district,
+                        providerAddress: doctor.providerId.address,
+                        providerPhone: doctor.providerId.phone,
+                        doctors: []
+                    };
+                }
+                
+                grouped[key].doctors.push({
+                    id: doctor._id,
+                    name: doctor.name,
+                    specialty: doctor.specialty,
+                    qualification: doctor.qualification,
+                    experience: doctor.experience,
+                    consultationFee: doctor.consultationFee,
+                    photo: doctor.photo || '/uploads/default-doctor.png'
+                });
+            }
+        });
+        
+        res.json(Object.values(grouped));
+    } catch (error) {
+        console.error('Get all doctors with providers error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -598,19 +652,6 @@ app.post('/api/appointments', authenticateToken, async (req, res) => {
                 ? maxQueueResult[0].maxQueue + 1
                 : 1;
 
-            const existingBooking = await Appointment.findOne({
-                providerId: doctor.providerId._id,
-                doctorId: doctor._id,
-                date,
-                time
-            });
-
-            if (existingBooking) {
-                return res.status(400).json({ 
-                    error: 'This time slot is already booked. Please choose another time.' 
-                });
-            }
-
             const appointment = new Appointment({
                 doctorId: doctor._id,
                 doctorName: doctor.name,
@@ -892,6 +933,222 @@ app.get('/api/tests', async (req, res) => {
         res.json(mockTests);
     } catch (error) {
         console.error('Get tests error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.get('/api/patient-appointments', authenticateToken, requirePatient, async (req, res) => {
+    try {
+        const appointments = await Appointment.find({ patientId: req.user.id })
+            .populate('doctorId')
+            .populate('providerId')
+            .sort({ date: -1, time: -1 });
+        
+        const formatted = appointments.map(apt => ({
+            _id: apt._id,
+            doctorName: apt.doctorName,
+            providerName: apt.providerName,
+            date: apt.date,
+            time: apt.time,
+            queueNumber: apt.queueNumber,
+            status: apt.status,
+            consultationFee: apt.consultationFee,
+            paymentStatus: apt.paymentStatus,
+            notes: apt.notes,
+            createdAt: apt.createdAt,
+            isUpcoming: new Date(`${apt.date}T${apt.time}`) > new Date()
+        }));
+        
+        res.json(formatted);
+    } catch (error) {
+        console.error('Get patient appointments error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.put('/api/appointments/:id/reschedule', authenticateToken, requirePatient, async (req, res) => {
+    try {
+        const { newDate, newTime } = req.body;
+        const appointment = await Appointment.findById(req.params.id);
+        
+        if (!appointment) {
+            return res.status(404).json({ error: 'Appointment not found' });
+        }
+        
+        if (appointment.patientId.toString() !== req.user.id) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+        
+        if (appointment.status === 'completed' || appointment.status === 'cancelled') {
+            return res.status(400).json({ error: `Cannot reschedule a ${appointment.status} appointment` });
+        }
+        
+        const existing = await Appointment.findOne({
+            providerId: appointment.providerId,
+            doctorId: appointment.doctorId,
+            date: newDate,
+            time: newTime,
+            _id: { $ne: appointment._id }
+        });
+        
+        if (existing) {
+            return res.status(400).json({ error: 'This time slot is already booked' });
+        }
+        
+        appointment.date = newDate;
+        appointment.time = newTime;
+        appointment.status = 'pending';
+        await appointment.save();
+        
+        res.json({
+            message: 'Appointment rescheduled successfully',
+            appointment: {
+                _id: appointment._id,
+                date: appointment.date,
+                time: appointment.time,
+                status: appointment.status
+            }
+        });
+    } catch (error) {
+        console.error('Reschedule error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.put('/api/appointments/:id/cancel', authenticateToken, requirePatient, async (req, res) => {
+    try {
+        const { reason } = req.body;
+        const appointment = await Appointment.findById(req.params.id);
+        
+        if (!appointment) {
+            return res.status(404).json({ error: 'Appointment not found' });
+        }
+        
+        if (appointment.patientId.toString() !== req.user.id) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+        
+        if (appointment.status === 'completed') {
+            return res.status(400).json({ error: 'Cannot cancel a completed appointment' });
+        }
+        
+        appointment.status = 'cancelled';
+        appointment.notes = `Cancelled - ${reason || 'No reason provided'}`;
+        await appointment.save();
+        
+        res.json({
+            message: 'Appointment cancelled successfully',
+            appointment: {
+                _id: appointment._id,
+                status: appointment.status
+            }
+        });
+    } catch (error) {
+        console.error('Cancel error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.put('/api/appointments/:id/complete', authenticateToken, async (req, res) => {
+    try {
+        const { prescription, notes } = req.body;
+        const appointment = await Appointment.findById(req.params.id).populate('providerId');
+        
+        if (!appointment) {
+            return res.status(404).json({ error: 'Appointment not found' });
+        }
+        
+        if (appointment.providerId.userId.toString() !== req.user.id) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+        
+        appointment.status = 'completed';
+        appointment.notes = notes || appointment.notes;
+        if (prescription) {
+            appointment.notes += `\n\nPrescription: ${prescription}`;
+        }
+        await appointment.save();
+        
+        res.json({
+            message: 'Appointment marked as completed',
+            appointment: {
+                _id: appointment._id,
+                status: appointment.status
+            }
+        });
+    } catch (error) {
+        console.error('Complete appointment error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.put('/api/appointments/:id/notes', authenticateToken, async (req, res) => {
+    try {
+        const { notes } = req.body;
+        const appointment = await Appointment.findById(req.params.id).populate('providerId');
+        
+        if (!appointment) {
+            return res.status(404).json({ error: 'Appointment not found' });
+        }
+        
+        const isProvider = appointment.providerId.userId.toString() === req.user.id;
+        const isPatient = appointment.patientId.toString() === req.user.id;
+        
+        if (!isProvider && !isPatient) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+        
+        const prefix = isProvider ? '[Doctor Notes]' : '[Patient Notes]';
+        const timestamp = new Date().toLocaleString();
+        appointment.notes += `\n\n${prefix} (${timestamp}):\n${notes}`;
+        await appointment.save();
+        
+        res.json({
+            message: 'Notes added successfully',
+            appointment: {
+                _id: appointment._id,
+                notes: appointment.notes
+            }
+        });
+    } catch (error) {
+        console.error('Add notes error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.get('/api/appointment-stats', authenticateToken, async (req, res) => {
+    try {
+        let query = {};
+        
+        if (req.user.role === 'patient') {
+            query = { patientId: req.user.id };
+        } else if (['pharmacy', 'clinic', 'hospital'].includes(req.user.role)) {
+            const provider = await HealthcareProvider.findOne({ userId: req.user.id });
+            query = { providerId: provider._id };
+        }
+        
+        const total = await Appointment.countDocuments(query);
+        const upcoming = await Appointment.countDocuments({
+            ...query,
+            status: { $in: ['pending', 'confirmed'] }
+        });
+        const completed = await Appointment.countDocuments({
+            ...query,
+            status: 'completed'
+        });
+        const cancelled = await Appointment.countDocuments({
+            ...query,
+            status: 'cancelled'
+        });
+        
+        res.json({
+            total,
+            upcoming,
+            completed,
+            cancelled
+        });
+    } catch (error) {
+        console.error('Stats error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });

@@ -391,7 +391,7 @@ function renderDoctors(doctorsList) {
 function createDoctorCard(doctor) {
     const card = document.createElement('div');
     card.className = 'card';
-    const photoUrl = doctor.photo || '/uploads/default-doctor.png';
+    const photoUrl = doctor.photo ? 'http://localhost:5000' + doctor.photo : 'http://localhost:5000/uploads/default-doctor.png';
     const availableSlots = doctor.availableSlots || [];
     const slotDisplay = Array.isArray(availableSlots) && availableSlots.length > 0 
         ? availableSlots.slice(0, 3).map(slot => {
@@ -902,7 +902,7 @@ function displayDoctorSearchResults(doctorsList, searchCriteria) {
     `;
 
     doctorsList.forEach(doctor => {
-        const photoUrl = doctor.photo || '/uploads/default-doctor.png';
+        const photoUrl = doctor.photo ? 'http://localhost:5000' + doctor.photo : 'http://localhost:5000/uploads/default-doctor.png';
         html += `
             <div class="card">
                 <div class="card-img" style="background-image: url('${photoUrl}'); background-size: cover; background-position: center; height: 200px;">
@@ -1122,15 +1122,25 @@ async function findHealthcareProviders() {
     currentSpecialty = specialty;
 
     try {
-        // Search for providers by location (district or state)
-        const providers = await apiCall(`/healthcare-providers?search=${encodeURIComponent(location)}`);
+        // Fetch from the new API endpoint that returns doctors grouped by providers
+        const data = await apiCall('/all-doctors-with-providers');
         
-        if (!providers || providers.length === 0) {
+        if (!data || data.length === 0) {
+            showNotification(`No healthcare providers found`, 'info');
+            return;
+        }
+
+        // Filter providers by location (district match)
+        const filteredProviders = data.filter(provider => 
+            provider.district && provider.district.toLowerCase().includes(location.toLowerCase())
+        );
+
+        if (filteredProviders.length === 0) {
             showNotification(`No healthcare providers found in ${location}`, 'info');
             return;
         }
 
-        displayHealthcareProviders(providers, { location, specialty });
+        displayProvidersWithDoctors(filteredProviders, { location, specialty });
         closeAllModals();
         showModal('providersModal');
     } catch (error) {
@@ -1218,7 +1228,7 @@ function simulateHealthcareProviderSearch(location, specialty) {
     return filtered;
 }
 
-function displayHealthcareProviders(providers, searchCriteria) {
+function displayProvidersWithDoctors(providers, searchCriteria) {
     const container = document.getElementById('providersContainer');
     const title = document.getElementById('providersTitle');
     
@@ -1268,7 +1278,12 @@ function displayHealthcareProviders(providers, searchCriteria) {
         html += `
             <div class="provider-card">
                 <div class="provider-header">
-                    <div class="provider-name">${provider.name}</div>
+                    <div>
+                        <div class="provider-name">${provider.name}</div>
+                        <div class="card-details" style="color: #666; font-size: 0.9rem;">
+                            <i class="fas fa-map-pin"></i> ${provider.district}
+                        </div>
+                    </div>
                     <div class="provider-type" style="background: ${typeColor}">
                         ${typeIcon} ${provider.type.toUpperCase()}
                     </div>
@@ -1277,54 +1292,50 @@ function displayHealthcareProviders(providers, searchCriteria) {
                 <div class="provider-info">
                     <div class="info-item">
                         <i class="fas fa-map-marker-alt"></i>
-                        ${provider.address}
-                    </div>
-                    <div class="info-item">
-                        <i class="fas fa-location-arrow"></i>
-                        ${provider.distance}
+                        ${provider.address || 'Address not available'}
                     </div>
                     <div class="info-item">
                         <i class="fas fa-phone"></i>
-                        ${provider.phone}
+                        ${provider.phone || 'Phone not available'}
                     </div>
-                    <div class="info-item">
-                        <i class="fas fa-star"></i>
-                        Rating: ${provider.rating}/5
-                    </div>
-                    <div class="info-item">
-                        <i class="fas fa-stethoscope"></i>
-                        Specialties: ${provider.specialties.join(', ')}
-                    </div>
+                    ${provider.rating ? `
+                        <div class="info-item">
+                            <i class="fas fa-star"></i>
+                            Rating: ${provider.rating}/5
+                        </div>
+                    ` : ''}
                 </div>
                 
                 <div class="provider-doctors">
                     <h4>Available Doctors:</h4>
                     <div class="doctors-list">
-                        ${provider.doctors.map(doctor => `
-                            <div class="doctor-item">
-                                <div class="doctor-info">
-                                    <div class="doctor-name">${doctor.name}</div>
-                                    <div class="doctor-specialty">${doctor.specialty}</div>
-                                </div>
-                                <div class="doctor-availability">
-                                    ${doctor.availableSlots.map(slot => `
-                                        <button class="time-slot" onclick="bookDoctorAppointment('${provider.id}', '${doctor.id}', '${slot}', '${doctor.name}', '${provider.name}')">
-                                            ${slot}
+                        ${provider.doctors && provider.doctors.length > 0 ? 
+                            provider.doctors.map(doctor => `
+                                <div class="doctor-item">
+                                    <div class="doctor-info">
+                                        <div class="doctor-name">${doctor.name}</div>
+                                        <div class="doctor-specialty">${doctor.specialty}</div>
+                                        ${doctor.qualification ? `<div class="card-details"><i class="fas fa-graduation-cap"></i> ${doctor.qualification}</div>` : ''}
+                                        ${doctor.consultationFee ? `<div class="card-details" style="color: #007bff; font-weight: 600;">₹${doctor.consultationFee}/consultation</div>` : ''}
+                                    </div>
+                                    <div style="margin-top: 10px;">
+                                        <button class="btn btn-primary btn-sm" onclick="openDoctorAvailability('${doctor._id || doctor.id}')">
+                                            <i class="fas fa-calendar-check"></i> Book Now
                                         </button>
-                                    `).join('')}
+                                    </div>
                                 </div>
-                            </div>
-                        `).join('')}
+                            `).join('')
+                            : '<p class="card-details">No doctors available</p>'
+                        }
                     </div>
                 </div>
                 
                 <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
-                    <button class="btn btn-primary" onclick="openDoctorAvailability('${provider.doctors[0]?.id || 'doc1'}')">
-                        <i class="fas fa-user-md"></i> View Doctors & Book
-                    </button>
-                    <button class="btn btn-outline" onclick="getDirections('${provider.address}')">
-                        <i class="fas fa-directions"></i> Get Directions
-                    </button>
+                    ${provider.address ? `
+                        <button class="btn btn-outline" onclick="getDirections('${provider.address}')">
+                            <i class="fas fa-directions"></i> Get Directions
+                        </button>
+                    ` : ''}
                 </div>
             </div>
         `;
@@ -1334,6 +1345,7 @@ function displayHealthcareProviders(providers, searchCriteria) {
     container.innerHTML = html;
 }
 
+//  till here
 function viewAllDoctors(providerId) {
     // Find the provider
     const providers = simulateHealthcareProviderSearch(currentLocation, currentSpecialty);

@@ -101,8 +101,6 @@ async function initializeDoctorAvailability() {
     updateWeekRangeDisplay();
 }
 
-// Doctor data is now fetched from backend API via initializeDoctorAvailability()
-
 function generateCalendar() {
     const calendarGrid = document.getElementById('calendarGrid');
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -356,6 +354,8 @@ async function generateTimeSlots() {
         const response = await fetch(`${API_BASE}/doctor-appointments/${doctorId}?date=${dateString}`);
         const appointments = response.ok ? await response.json() : [];
         
+        console.log('✅ Fetched appointments:', appointments);
+        
         // Parse start and end times
         const [startHour, startMin] = dayHours.startTime.split(':').map(Number);
         const [endHour, endMin] = dayHours.endTime.split(':').map(Number);
@@ -409,6 +409,8 @@ function selectTimeSlot(slotElement) {
         time: slotElement.getAttribute('data-time'),
         queuePosition: parseInt(slotElement.getAttribute('data-queue'))
     };
+    
+    console.log('🕐 Selected time slot:', selectedTimeSlot);
     
     // Show queue information
     showQueueInfo();
@@ -467,13 +469,15 @@ function closeQueueInfo() {
 }
 
 async function confirmBooking() {
+    console.log('🔔 CONFIRM BOOKING CLICKED');
+    
     if (!selectedTimeSlot) {
         showNotification('Please select a time slot first.', 'error');
         return;
     }
     
     // Check if user is logged in
-    const token = localStorage.getItem('authToken');
+    const token = localStorage.getItem('authToken') || localStorage.getItem('token');
     if (!token) {
         showNotification('Please login to book an appointment.', 'error');
         window.location.href = 'index.html';
@@ -488,6 +492,8 @@ async function confirmBooking() {
     try {
         // POST booking to backend API
         const doctorId = currentDoctor._id || currentDoctor.id;
+        console.log('📤 Posting booking to backend...');
+        
         const response = await fetch(`${API_BASE}/appointments`, {
             method: 'POST',
             headers: {
@@ -522,12 +528,13 @@ async function confirmBooking() {
         // Store appointment data in localStorage (more reliable than sessionStorage)
         const bookingData = {
             id: appointmentId,
-            doctorName: result.appointment.doctorName,
-            providerName: result.appointment.providerName,
+            doctorName: result.appointment.doctorName || currentDoctor.name,
+            providerName: result.appointment.providerName || currentDoctor.hospital,
+            specialty: result.appointment.specialty || currentDoctor.specialty,
             date: result.appointment.date,
             time: result.appointment.time,
             queueNumber: result.appointment.queueNumber,
-            consultationFee: result.appointment.consultationFee
+            consultationFee: result.appointment.consultationFee || currentDoctor.consultationFee || 500
         };
         
         localStorage.setItem('currentBooking', JSON.stringify(bookingData));
@@ -538,6 +545,7 @@ async function confirmBooking() {
         
         // Direct redirect with no query params
         setTimeout(() => {
+            console.log('🔄 Redirecting to booking dashboard');
             window.location.href = 'booking-dashboard.html';
         }, 1000);
         
@@ -647,3 +655,5 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+console.log('✅ doctor-availability.js FULLY LOADED');

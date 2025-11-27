@@ -50,14 +50,13 @@ class ProviderAuth {
 
     // Optimize for mobile devices
     optimizeForMobile() {
-        // Add touch-friendly styles
         const style = document.createElement('style');
         style.textContent = `
             .mobile-device .btn {
                 min-height: 44px;
             }
             .mobile-device .form-control {
-                font-size: 16px; /* Prevents zoom on iOS */
+                font-size: 16px;
             }
             .mobile-device .provider-type-btn {
                 min-height: 60px;
@@ -65,7 +64,6 @@ class ProviderAuth {
         `;
         document.head.appendChild(style);
 
-        // Prevent zoom on input focus
         document.addEventListener('touchstart', function() {}, { passive: true });
     }
 
@@ -86,7 +84,6 @@ class ProviderAuth {
 
     // Setup event listeners
     setupEventListeners() {
-        // Provider type selection
         document.querySelectorAll('.provider-type-btn').forEach(btn => {
             if (this.isTouchDevice) {
                 btn.addEventListener('touchstart', (e) => this.handleProviderTypeSelect(e));
@@ -95,7 +92,6 @@ class ProviderAuth {
             }
         });
 
-        // Auth tabs
         document.querySelectorAll('.auth-tab').forEach(tab => {
             if (this.isTouchDevice) {
                 tab.addEventListener('touchstart', (e) => this.handleAuthTabSelect(e));
@@ -104,11 +100,9 @@ class ProviderAuth {
             }
         });
 
-        // Form submissions
         document.getElementById('providerLoginForm').addEventListener('submit', (e) => this.handleProviderLogin(e));
         document.getElementById('providerSignupForm').addEventListener('submit', (e) => this.handleProviderSignup(e));
 
-        // Real-time preview updates with debouncing for performance
         const debounce = (func, wait) => {
             let timeout;
             return function executedFunction(...args) {
@@ -125,14 +119,12 @@ class ProviderAuth {
         document.getElementById('facilityName').addEventListener('input', debouncedPreviewUpdate);
         document.getElementById('facilityAddress').addEventListener('input', debouncedPreviewUpdate);
 
-        // Handle orientation changes
         window.addEventListener('orientationchange', () => {
             setTimeout(() => {
                 this.handleOrientationChange();
             }, 300);
         });
 
-        // Handle resize with debouncing
         window.addEventListener('resize', debounce(() => {
             this.handleResize();
         }, 250));
@@ -143,17 +135,14 @@ class ProviderAuth {
         const target = e.currentTarget;
         const providerType = target.getAttribute('data-type');
         
-        // Remove active class from all buttons
         document.querySelectorAll('.provider-type-btn').forEach(b => {
             b.classList.remove('active');
         });
         
-        // Add active class to clicked button
         target.classList.add('active');
         this.currentProviderType = providerType;
         this.updateFacilityPreview();
         
-        // Add haptic feedback for mobile devices
         if (this.isTouchDevice && navigator.vibrate) {
             navigator.vibrate(50);
         }
@@ -164,19 +153,16 @@ class ProviderAuth {
         const target = e.currentTarget;
         const tabId = target.getAttribute('data-tab');
         
-        // Update active tab
         document.querySelectorAll('.auth-tab').forEach(t => {
             t.classList.remove('active');
         });
         target.classList.add('active');
 
-        // Show corresponding form
         document.querySelectorAll('.auth-form').forEach(form => {
             form.classList.remove('active');
         });
         document.getElementById(`provider${tabId.charAt(0).toUpperCase() + tabId.slice(1)}Form`).classList.add('active');
 
-        // Add haptic feedback for mobile devices
         if (this.isTouchDevice && navigator.vibrate) {
             navigator.vibrate(30);
         }
@@ -190,7 +176,6 @@ class ProviderAuth {
         document.getElementById('previewFacilityType').textContent = this.currentProviderType.charAt(0).toUpperCase() + this.currentProviderType.slice(1);
         document.getElementById('previewFacilityAddress').textContent = facilityAddress;
 
-        // Show preview if there's any input
         const preview = document.getElementById('facilityPreview');
         if (facilityName !== 'Your Facility Name' || facilityAddress !== 'Your facility address will appear here') {
             preview.classList.add('active');
@@ -205,7 +190,6 @@ class ProviderAuth {
         const email = document.getElementById('providerLoginEmail').value;
         const password = document.getElementById('providerLoginPassword').value;
 
-        // Show loading state
         this.setLoadingState('providerLoginForm', true);
 
         try {
@@ -219,13 +203,11 @@ class ProviderAuth {
             
             this.showNotification('Provider login successful!', 'success');
             
-            // Redirect to provider dashboard
             setTimeout(() => {
                 window.location.href = 'provider-dashboard.html';
             }, 1000);
 
         } catch (error) {
-            // Try demo authentication
             this.handleDemoProviderLogin(email, password);
         } finally {
             this.setLoadingState('providerLoginForm', false);
@@ -244,7 +226,6 @@ class ProviderAuth {
         const district = document.getElementById('facilityDistrict').value;
         const state = document.getElementById('facilityState').value;
 
-        // Validate form
         if (!this.validateProviderForm(facilityName, email, password, phone, registrationNumber, address, district, state)) {
             return;
         }
@@ -265,7 +246,6 @@ class ProviderAuth {
             }
         };
 
-        // Show loading state
         this.setLoadingState('providerSignupForm', true);
 
         try {
@@ -279,13 +259,11 @@ class ProviderAuth {
             
             this.showNotification(`${this.currentProviderType.charAt(0).toUpperCase() + this.currentProviderType.slice(1)} registered successfully!`, 'success');
             
-            // Redirect to provider dashboard
             setTimeout(() => {
                 window.location.href = 'provider-dashboard.html';
             }, 1500);
 
         } catch (error) {
-            // Create demo provider account
             this.createDemoProviderAccount(providerData);
         } finally {
             this.setLoadingState('providerSignupForm', false);
@@ -294,7 +272,7 @@ class ProviderAuth {
 
     validateProviderForm(facilityName, email, password, phone, registrationNumber, address, district, state) {
         if (!facilityName || !email || !password || !phone || !registrationNumber || !address || !district || !state) {
-            this.showNotification('Please fill in all required fields including district and state', 'error');
+            this.showNotification('Please fill in all required fields', 'error');
             return false;
         }
 
@@ -377,7 +355,6 @@ class ProviderAuth {
         users.push(newProvider);
         localStorage.setItem('users', JSON.stringify(users));
         
-        // Create demo healthcare provider record
         const providers = JSON.parse(localStorage.getItem('healthcareProviders')) || [];
         const newProviderRecord = {
             id: newProvider.id,
@@ -417,7 +394,6 @@ class ProviderAuth {
         return facilities[providerType] || ['Healthcare Services'];
     }
 
-    // API call function
     async apiCall(endpoint, options = {}) {
         try {
             const token = localStorage.getItem('token');
@@ -430,47 +406,49 @@ class ProviderAuth {
                 headers['Authorization'] = `Bearer ${token}`;
             }
 
-            const response = await fetch(`/api${endpoint}`, {
+            const url = `http://localhost:5000/api${endpoint}`;
+            console.log('📤 API Call:', url);
+            
+            const response = await fetch(url, {
                 headers,
                 ...options
             });
 
+            console.log('📊 Response Status:', response.status);
+            const data = await response.json();
+            console.log('📥 Response Data:', data);
+
             if (!response.ok) {
-                throw new Error(`API call failed: ${response.statusText}`);
+                throw new Error(data.error || `API call failed: ${response.statusText}`);
             }
 
-            return await response.json();
+            return data;
         } catch (error) {
-            console.error('API Call Error:', error);
+            console.error('❌ API Call Error:', error);
             throw error;
         }
     }
 
-    // Device event handlers
     handleOrientationChange() {
         console.log('Orientation changed:', window.orientation);
-        // Re-apply mobile optimizations if needed
         if (this.isMobile) {
             this.optimizeForMobile();
         }
     }
 
     handleResize() {
-        // Update device detection on resize
         const wasMobile = this.isMobile;
         const wasTablet = this.isTablet;
         
         this.isMobile = this.detectMobile();
         this.isTablet = this.detectTablet();
         
-        // Only re-apply if device type changed
         if (wasMobile !== this.isMobile || wasTablet !== this.isTablet) {
             document.body.classList.remove('mobile-device', 'tablet-device', 'desktop-device');
             this.applyDeviceSpecificStyles();
         }
     }
 
-    // Notification system
     showNotification(message, type = 'info') {
         const notification = document.createElement('div');
         notification.className = `notification ${type}`;
@@ -479,7 +457,6 @@ class ProviderAuth {
             <span>${message}</span>
         `;
         
-        // Add notification styles if not exists
         if (!document.querySelector('#notification-styles')) {
             const styles = document.createElement('style');
             styles.id = 'notification-styles';
@@ -526,10 +503,8 @@ class ProviderAuth {
         
         document.body.appendChild(notification);
         
-        // Trigger animation
         setTimeout(() => notification.classList.add('show'), 100);
         
-        // Auto remove
         setTimeout(() => {
             notification.classList.remove('show');
             setTimeout(() => {
@@ -539,7 +514,6 @@ class ProviderAuth {
             }, 400);
         }, 4000);
         
-        // Click to dismiss
         notification.addEventListener('click', () => {
             notification.classList.remove('show');
             setTimeout(() => {
@@ -560,16 +534,14 @@ class ProviderAuth {
     }
 }
 
-// Initialize the provider auth system when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     new ProviderAuth();
 });
 
-// Handle page visibility changes for better performance
 document.addEventListener('visibilitychange', function() {
     if (document.hidden) {
-        // Page is hidden, pause any animations if needed
+        
     } else {
-        // Page is visible, resume animations
+        
     }
 });
